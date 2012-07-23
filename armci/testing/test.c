@@ -417,7 +417,7 @@ void create_array(void *a[], int elem_size, int ndim, int dims[])
 void destroy_array(void *ptr[])
 {
   ARMCI_Barrier();
-#if 0
+#if 1
   assert(!ARMCI_Free(ptr[me]));
 #endif
 }
@@ -898,6 +898,8 @@ void test_vec_small()
     free(putsrc[i]);
   }
   free(putsrc);
+  ARMCI_Free(getsrc[me]);
+  ARMCI_Free(putdst[me]);
 }
 
 
@@ -2174,11 +2176,10 @@ int main(int argc, char *argv[])
 
   if (me == 0) {
     printf("\nTesting Accumulate with Vector Interface\n\n");
-    printf("\nSKIPPING!!!\n");
     fflush(stdout);
     sleep(1);
   }
-  //test_vector_acc();
+  test_vector_acc();
 
   ARMCI_AllFence();
   ARMCI_Barrier();

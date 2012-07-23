@@ -6,6 +6,8 @@
 
 #include "tcgmsgP.h"
 
+extern int ARMCI_COMM_WORLD;
+
 /************************ nonblocking message list ********************/
 #define MAX_Q_LEN 1024         /* Maximum no. of outstanding messages */
 static struct msg_q_struct{
@@ -33,15 +35,13 @@ void SND_(Integer *type, void *buf, Integer *lenbuf, Integer *node, Integer *syn
     }
 
     if (*sync){
-        ierr = MPI_Send(buf, (int)*lenbuf, MPI_CHAR, (int)*node, ttype,
-                TCGMSG_Comm);
-        tcgmsg_test_statusM("SND_:", ierr);
+        armci_msg_snd(ttype, buf, (int)*lenbuf, (int)*node);
     }else{
         if (n_in_msg_q >= MAX_Q_LEN) {
             Error("SND:overflowing async Q limit", n_in_msg_q);
         }
         ierr = MPI_Isend(buf, (int)*lenbuf, MPI_CHAR,(int)*node, ttype,
-                TCGMSG_Comm, &msg_q[n_in_msg_q].request);
+                ARMCI_COMM_WORLD, &msg_q[n_in_msg_q].request);
         tcgmsg_test_statusM("nonblocking SND_:", ierr);
 
         msg_q[n_in_msg_q].node   = *node;
@@ -76,7 +76,7 @@ void RCV_(Integer *type, void *buf, Integer *lenbuf, Integer *lenmes, Integer *n
             Error("nonblocking RCV_: overflowing async Q limit", n_in_msg_q);
         }
 
-        ierr = MPI_Irecv(buf, count, MPI_CHAR, node, (int)*type, TCGMSG_Comm,
+        ierr = MPI_Irecv(buf, count, MPI_CHAR, node, (int)*type, ARMCI_COMM_WORLD,
                 &request);
         tcgmsg_test_statusM("nonblocking RCV_:", ierr);
 
@@ -89,13 +89,14 @@ void RCV_(Integer *type, void *buf, Integer *lenbuf, Integer *lenmes, Integer *n
         msg_q[n_in_msg_q].snd = 0;
         n_in_msg_q++;
     } else {
-        ierr = MPI_Recv(buf, count, MPI_CHAR, node, (int)*type, TCGMSG_Comm,
-                &status);
-        tcgmsg_test_statusM("RCV_:", ierr);
-        ierr = MPI_Get_count(&status, MPI_CHAR, &count);
-        tcgmsg_test_statusM("RCV:Get_count:", ierr);
-        *nodefrom = (Integer)status.MPI_SOURCE; 
-        *lenmes   = (Integer)count;
+        if (MPI_ANY_SOURCE == node) {
+            *nodefrom = (Integer)armci_msg_rcvany((int)*type, buf, count, &count);
+        }
+        else {
+            armci_msg_rcv((int)*type, buf, count, &count, node);
+            *nodefrom = (Integer)node;
+        }
+        *lenmes = (Integer)count;
     }
 }
 
@@ -106,13 +107,17 @@ void WAITCOM_(Integer *nodesel)
     MPI_Status status;
 
     for (i=0; i<n_in_msg_q; i++){
+        int flag = 0;
         if (DEBUG_) {
             (void) printf("WAITCOM: " FMT_INT " waiting for msg to/from node " FMT_INT ", #%d\n",
                           NODEID_(), msg_q[i].node, i);
             (void) fflush(stdout);
         }
-        ierr = MPI_Wait(&msg_q[i].request, &status);
-        tcgmsg_test_statusM("WAITCOM:", ierr);
+        do {
+            ierr = MPI_Test(&msg_q[i].request, &flag, &status);
+            tcgmsg_test_statusM("WAITCOM:", ierr);
+            armci_make_progress();
+        } while (!flag);
     }
     n_in_msg_q = 0;
 }
@@ -124,7 +129,7 @@ Integer PROBE_(Integer *type, Integer *node)
     MPI_Status status;
 
     source = (*node < 0) ? MPI_ANY_SOURCE : (int) *node;
-    ierr   = MPI_Iprobe(source, (int)*type, TCGMSG_Comm, &flag, &status);
+    ierr   = MPI_Iprobe(source, (int)*type, ARMCI_COMM_WORLD, &flag, &status);
     tcgmsg_test_statusM("PROBE:", ierr);
 
     return (flag == 0 ? 0 : 1);

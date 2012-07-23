@@ -60,7 +60,7 @@ void NextValueServer()
                 for (node=0; node<NNODES_(); node++) {
                     MPI_Send(&cnt, 1, MPI_LONG,  node, type, MPI_COMM_WORLD); 
                 }
-                MPI_Barrier(MPI_COMM_WORLD);
+                ARMCI_Barrier();
                 MPI_Finalize();
                 exit(0);
             }

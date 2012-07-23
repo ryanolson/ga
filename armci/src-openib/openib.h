@@ -19,7 +19,7 @@
 #define DEFAULT_ITERATIONS      (10000)
 #define DEFAULT_NUM_CQE         (40000)
 #define DEFAULT_NUM_OUST_RECV   (0)
-#define DEFAULT_NUM_OUST_SEND   (64)
+#define DEFAULT_NUM_OUST_SEND   (128)
 #define DEFAULT_NUM_SGE         (1)
 #define DEFAULT_WINDOW_SIZE     (32)
 #define ALIGNMENT               (64)

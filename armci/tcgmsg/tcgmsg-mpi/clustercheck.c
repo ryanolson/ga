@@ -2,19 +2,10 @@
 #   include "config.h"
 #endif
 
-#include <mpi.h>
+#include "message.h"
 
-#if HAVE_STDLIB_H
-#   include <stdlib.h>
-#endif
-#if HAVE_STDIO_H
-#   include <stdio.h>
-#endif
 #if HAVE_STRING_H
 #   include <string.h>
-#endif
-#if HAVE_WINSOCK_H
-#   include <winsock.h>
 #endif
 #if HAVE_UNISTD_H
 #   include <unistd.h>
@@ -28,20 +19,15 @@ static char myname[HOSTNAME_LEN], rootname[HOSTNAME_LEN];
  */
 int single_cluster()
 {
-    int rc,me,root=0,stat,global_stat,len;
+    int me,root=0,stat,len;
 
     gethostname(myname, HOSTNAME_LEN-1);
-    rc = MPI_Comm_rank(MPI_COMM_WORLD, &me);
+    me = armci_msg_me();
     if(me==root) {
-        rc = MPI_Bcast(myname,HOSTNAME_LEN,MPI_CHAR,root,MPI_COMM_WORLD);
+        armci_msg_bcast(myname, HOSTNAME_LEN, root);
     } else {
-        rc = MPI_Bcast(rootname, HOSTNAME_LEN,MPI_CHAR,root,MPI_COMM_WORLD);
+        armci_msg_bcast(rootname, HOSTNAME_LEN, root);
     }
-
-    if(rc != MPI_SUCCESS){
-        fprintf(stderr,"single_cluster:MPI_Bcast failed rc=%d\n",rc);
-        MPI_Abort(MPI_COMM_WORLD,rc);
-    } 
 
     len = strlen(myname);
     stat = (me==root) ? 0 : strncmp(rootname, myname, len);
@@ -50,14 +36,9 @@ int single_cluster()
         stat = 1;
     }
 
-    rc = MPI_Allreduce(&stat, &global_stat, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    armci_msg_reduce(&stat, 1, "+", ARMCI_INT);
 
-    if(rc != MPI_SUCCESS){
-        fprintf(stderr,"single_cluster:MPI_MPI_Allreduce failed rc=%d\n",rc);
-        MPI_Abort(MPI_COMM_WORLD,rc);
-    } 
-
-    if(global_stat) {
+    if(stat) {
         return 0;
     } else {
         return 1;

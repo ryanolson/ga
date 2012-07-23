@@ -29,9 +29,10 @@ typedef struct {
 } SingleComplex;
 
 
-int   PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
+int   PARMCI_NbPutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
                  void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
-                 int count[/*stride_levels+1*/], int stride_levels, int proc)
+                 int count[/*stride_levels+1*/], int stride_levels, int proc,
+                 armci_hdl_t *hdl)
 {
     int i, j;
     long src_idx, dst_idx;    /* index offset of current block position to ptr */
@@ -94,9 +95,10 @@ int   PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
 }
 
 
-int   PARMCI_GetS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
+int   PARMCI_NbGetS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
                  void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
-                 int count[/*stride_levels+1*/], int stride_levels, int proc)
+                 int count[/*stride_levels+1*/], int stride_levels, int proc,
+                 armci_hdl_t *hdl)
 {
     int i, j;
     long src_idx, dst_idx;    /* index offset of current block position to ptr */
@@ -156,10 +158,11 @@ int   PARMCI_GetS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
     return 0;
 }
 
-int  PARMCI_AccS(int datatype, void *scale,
+int  PARMCI_NbAccS(int datatype, void *scale,
                  void *src_ptr, int src_stride_ar[/*stride_levels*/],
                  void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
-                 int count[/*stride_levels+1*/], int stride_levels, int proc)
+                 int count[/*stride_levels+1*/], int stride_levels, int proc,
+                 armci_hdl_t *hdl)
 {
     int i, j;
     long src_idx, dst_idx;    /* index offset of current block position to ptr */
@@ -193,20 +196,15 @@ int  PARMCI_AccS(int datatype, void *scale,
 
     /* TODO: Can we allocate a temporary buffer like we did for the
      * gemini port? */
-#if 0
     if (sizetogetput <= l_state.acc_buf_len) {
         get_buf = l_state.acc_buf;
     }
     else {
-        get_buf = (char *)malloc(sizeof(char) * sizetogetput);
+        void *rinfo;
+        get_buf = ARMCI_Malloc_local(sizetogetput);
     }
 
     assert(get_buf);
-#else
-    assert(sizetogetput <= l_state.acc_buf_len);
-    assert(l_state.acc_buf);
-    get_buf = l_state.acc_buf;
-#endif
 
     /* grab the atomics lock */
     ARMCID_network_lock(proc);
@@ -287,44 +285,45 @@ int  PARMCI_AccS(int datatype, void *scale,
     ARMCID_waitproc(proc);
     ARMCID_network_unlock(proc);
 
-#if 0
     if (sizetogetput > l_state.acc_buf_len) {
-        free(get_buf);
+        ARMCI_Free_local(get_buf);
     }
-#endif
 
     return 0;
 }
 
 
-int   PARMCI_NbPutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
+int   PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
         void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
         int count[/*stride_levels+1*/], int stride_levels,
-        int proc, armci_hdl_t *hdl)
+        int proc)
 {
-    return PARMCI_PutS(src_ptr, src_stride_ar, dst_ptr,
-            dst_stride_ar, count,stride_levels,proc);
+    PARMCI_NbPutS(src_ptr, src_stride_ar, dst_ptr,
+            dst_stride_ar, count,stride_levels,proc, NULL);
+    ARMCID_waitproc(proc);
 
 }
 
 
-int   PARMCI_NbGetS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
+int   PARMCI_GetS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
                    void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
                    int count[/*stride_levels+1*/], int stride_levels,
-                   int proc, armci_hdl_t *hdl)
+                   int proc)
 {   
-    return PARMCI_GetS(src_ptr, src_stride_ar, dst_ptr,
-            dst_stride_ar, count,stride_levels, proc);
+    PARMCI_NbGetS(src_ptr, src_stride_ar, dst_ptr,
+            dst_stride_ar, count,stride_levels, proc, NULL);
+    ARMCID_waitproc(proc);
 }
     
-int   PARMCI_NbAccS(int datatype, void *scale,
+int   PARMCI_AccS(int datatype, void *scale,
                    void *src_ptr, int src_stride_ar[/*stride_levels*/],
                    void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
                    int count[/*stride_levels+1*/],
-                   int stride_levels, int proc, armci_hdl_t *hdl)
+                   int stride_levels, int proc)
 {
-    return PARMCI_AccS(datatype, scale, src_ptr, src_stride_ar, 
-            dst_ptr, dst_stride_ar, count, stride_levels, proc);
+    PARMCI_NbAccS(datatype, scale, src_ptr, src_stride_ar, 
+            dst_ptr, dst_stride_ar, count, stride_levels, proc, NULL);
+    ARMCID_waitproc(proc);
 }   
     
 

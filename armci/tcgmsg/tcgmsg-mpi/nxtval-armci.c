@@ -32,7 +32,6 @@ extern char  ***tcgi_argv;
 Integer NXTVAL_(Integer *mproc)
 {
     Integer local;
-    int rc;
     int server = NXTV_SERVER;         /* id of server process */
 
     install_nxtval(tcgi_argc, tcgi_argv);
@@ -45,20 +44,14 @@ Integer NXTVAL_(Integer *mproc)
         }
 
         if (*mproc < 0) {
-            rc=MPI_Barrier(MPI_COMM_WORLD); 
-            if(rc!=MPI_SUCCESS) {
-                Error("nxtval: barrier failed",0);
-            }
+            ARMCI_Barrier();
 
             /* reset the counter value to zero */
             if( NODEID_() == server) {
                 *pnxtval_counter = 0;
             }
 
-            rc=MPI_Barrier(MPI_COMM_WORLD); 
-            if(rc!=MPI_SUCCESS) {
-                Error("nxtval: barrier failed",0);
-            }
+            ARMCI_Barrier();
         }
         if (*mproc > 0) {
 #if   SIZEOF_F77_INTEGER == SIZEOF_INT
@@ -68,7 +61,7 @@ Integer NXTVAL_(Integer *mproc)
 #else
 #   error
 #endif
-            rc = ARMCI_Rmw(op,(void*)&local,(void*)pnxtval_counter,1,server);
+            ARMCI_Rmw(op,(void*)&local,(void*)pnxtval_counter,1,server);
         }
     } else {
         /* Not running in parallel ... just do a simulation */
@@ -130,10 +123,7 @@ void install_nxtval(int *argc, char **argv[])
     }
 
     free(ptr_ar);
-    rc=MPI_Barrier(MPI_COMM_WORLD); 
-    if(rc!=MPI_SUCCESS) {
-        Error("init_nxtval: barrier failed",0);
-    }
+    ARMCI_Barrier();
 }
 
 

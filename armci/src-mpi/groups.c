@@ -318,4 +318,9 @@ void armci_group_finalize()
         armci_igroup_finalize(previous_group_list_item);
         free(previous_group_list_item);
     }
+
+    /* ok, now free the world group */
+    MPI_Group_free(&(group_list->group));
+    free(group_list);
+    group_list = NULL;
 }

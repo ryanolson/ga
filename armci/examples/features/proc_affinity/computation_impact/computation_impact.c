@@ -198,14 +198,14 @@ int right;
     myptrs = (char **)malloc(sizeof(char *)*nprocs);
     ARMCI_Malloc((void **)myptrs,size);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
 
     gpcwork_memcpy = ARMCI_Gpc_register(gpc_work_handler_memcpy);
     gpcwork_ddot =ARMCI_Gpc_register(gpc_work_handler_ddot);
     gpcwork_daxpy = ARMCI_Gpc_register(gpc_work_handler_daxpy);
     gpcwork_dgemm = ARMCI_Gpc_register(gpc_work_handler_dgemm);
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
+    ARMCI_Barrier();
 
     ARMCI_Gpc_init_handle(&nbh);
     if(ARMCI_Gpc_exec(gpcwork_memcpy, right, &header, hlen, loc, sizeof(int), 
@@ -243,8 +243,8 @@ int right;
 
     ARMCI_Gpc_wait(&nbh);
     
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
+    ARMCI_Barrier();
 
     ARMCI_Gpc_init_handle(&nbh);
     if(ARMCI_Gpc_exec(gpcwork_ddot, right, &header, hlen, loc, sizeof(int), 
@@ -280,8 +280,8 @@ int right;
     }
     ARMCI_Gpc_wait(&nbh);
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
+    ARMCI_Barrier();
 
     ARMCI_Gpc_init_handle(&nbh);
     if(ARMCI_Gpc_exec(gpcwork_daxpy, right, &header, hlen, loc, sizeof(int), 
@@ -317,7 +317,7 @@ int right;
     }
     ARMCI_Gpc_wait(&nbh);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
 
     ARMCI_Gpc_init_handle(&nbh);
     if(ARMCI_Gpc_exec(gpcwork_dgemm, right, &header, hlen, loc, sizeof(int), 
@@ -353,7 +353,7 @@ int right;
     }
     ARMCI_Gpc_wait(&nbh);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
 
     ARMCI_AllFence();
 

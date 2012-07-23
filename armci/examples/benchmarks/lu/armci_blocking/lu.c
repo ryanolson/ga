@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
     MPI_Win_create((void*)ptr[me], proc_bytes, 1, MPI_INFO_NULL,
                    MPI_COMM_WORLD, &win);
     for(i=0; i<nproc; i++) ptr[i] = (double *)ptr[me];
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
     
 #else
     /* initialize ARMCI */

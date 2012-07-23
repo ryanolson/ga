@@ -37,8 +37,13 @@ void pnga_msg_brdcst(Integer type, void *buffer, Integer len, Integer root)
     int p_grp = (int)pnga_pgroup_get_default();
     if (p_grp > 0) {
 #   ifdef MPI
+#if 0
         int aroot = PGRP_LIST[p_grp].inv_map_proc_list[root];
         armci_msg_group_bcast_scope(SCOPE_ALL,buffer, (int)len, aroot,(&(PGRP_LIST[p_grp].group)));
+#endif
+        int aroot = root;
+        armci_msg_group_bcast_scope(SCOPE_ALL,buffer, (int)len,
+                aroot,(&(PGRP_LIST[p_grp].group)));
 #   endif
     } else {
         armci_msg_bcast(buffer, (int)len, (int)root);
@@ -75,8 +80,13 @@ void pnga_pgroup_brdcst(Integer grp_id, Integer type, void *buf,
     _ga_sync_begin = 1; _ga_sync_end=1; /*remove any previous masking*/
     if (p_grp > 0) {
 #ifdef MPI
+#if 0
        int aroot = PGRP_LIST[p_grp].inv_map_proc_list[originator];
        armci_msg_group_bcast_scope(SCOPE_ALL,buf,(int)len,aroot,(&(PGRP_LIST[p_grp].group)));
+#endif
+       int aroot = (int)originator;
+       armci_msg_group_bcast_scope(SCOPE_ALL, buf, (int)len, (int)aroot,
+               (&(PGRP_LIST[p_grp].group)));
 #endif
     } else {
        int aroot = (int)originator;

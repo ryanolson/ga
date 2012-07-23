@@ -44,7 +44,6 @@
 #define MAX_PROCESS 100000
 #define TYPE_NXTVAL 33333
 
-extern MPI_Comm TCGMSG_Comm;
 extern int      SR_parallel;
 extern int      SR_single_cluster;
 extern Integer  DEBUG_;

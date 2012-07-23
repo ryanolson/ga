@@ -70,6 +70,18 @@ struct ibv_sge      rr_sg_entry;
 
 pthread_t           test_async_thread;
 
+void openib_init_envs()
+{
+    char *value;
+    if ((value = getenv("ARMCI_OPENIB_USE_DREG")) != NULL){
+        l_state.armci_openib_use_dreg = (atoi(value));
+    }
+    else {
+        l_state.armci_openib_use_dreg = 0;
+    }
+
+
+}
 
 void init_params(void)
 {
@@ -138,10 +150,6 @@ double my_wtime()
 void release_resources(void)
 {
     int i;
-    if(ibv_dereg_mr(lbuf.mr)) {
-        fprintf(stderr,"Couldn't deregister buffer %s\n",
-                ibv_get_device_name(hca.ib_dev));
-    }
    
     // Destroy the registration cache
 
@@ -155,11 +163,11 @@ void release_resources(void)
             }
         }
     }
+#if 0
     if(ibv_destroy_cq(hca.cq)) {
         fprintf(stderr,"Couldn't destroy cq %s\n",
                 ibv_get_device_name(hca.ib_dev));
     }
-#if 0
     if(ibv_dealloc_pd(hca.pd)) {
         fprintf(stderr,"Couldn't free pd %s\n",
                 ibv_get_device_name(hca.ib_dev));
@@ -172,9 +180,10 @@ void release_resources(void)
 
     free(rbuf.qp_num);
     free(rbuf.lid);
+#if 0
     free(rbuf.rkey); 
     free(rbuf.buf);
-    free(lbuf.buf_original);
+#endif
 }
 
 int open_hca(void)
@@ -215,51 +224,6 @@ int open_hca(void)
 }
 
 
-int reg_buf(void)
-{
-    int i;
-    
-    lbuf.buf_original = (char *) malloc(2 * opts.msg_size+opts.align);
-
-    if(NULL == lbuf.buf_original) {
-        fprintf(stderr,"Malloc failed\n");
-        return 1;
-    }
-
-    lbuf.buf = (char*) (((unsigned long) lbuf.buf_original +
-                (opts.align - 1)) / opts.align * opts.align);
-
-    /* Touch the entire buffer */
-	if(0 == me) {
-    	for(i = 0; i < 2 * opts.msg_size; i++) {
-        	lbuf.buf[i] = 83;
-    	}
-	} else {
-        for(i = 0; i < 2 * opts.msg_size; i++) {
-            lbuf.buf[i] = 84;
-        }
-	
-	}	
-
-	lbuf.tmp = lbuf.buf + opts.msg_size;
-	/* Register twice the buffer for bidirectional bandwidth test */
-    lbuf.mr = ibv_reg_mr(hca.pd, lbuf.buf, 2 * opts.msg_size,
-            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
-            IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC);
-
-    if(NULL == lbuf.mr) {
-        fprintf(stderr,"Error in registering\n");
-        return 1;
-    }
-#ifdef DEBUG
-    fprintf(stdout,"[%d] LKey %u, RKey %u\n", me, lbuf.mr->lkey,
-            lbuf.mr->rkey);
-
-    fflush(stdout);
-#endif
-    return 0;
-}
-
 int create_cq(void)
 {
     hca.cq = ibv_create_cq(hca.context, opts.num_cqe, NULL, NULL, 0);
@@ -282,13 +246,6 @@ int exch_addr(void)
             (void *)rbuf.lid, sizeof(uint16_t), MPI_BYTE, l_state.world_comm);
     assert(!rc); 
 
-    rc = MPI_Allgather((void *)&lbuf.mr->rkey, sizeof(uint32_t), MPI_BYTE,
-            (void *)rbuf.rkey, sizeof(uint32_t), MPI_BYTE, l_state.world_comm);
-    assert(!rc); 
-    
-    rc = MPI_Allgather((void *)&lbuf.buf, sizeof(void *), MPI_BYTE,
-            (void *)rbuf.buf, sizeof(void*), MPI_BYTE, l_state.world_comm);
-    assert(!rc); 
 #ifdef DEBUG
     for (i = 0; i < nprocs; i++) {
         if (me == i)
@@ -581,12 +538,11 @@ void * openib_register_memory(void *buf, int len)
             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE
             | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC);
 
-    assert(mr);
-
-    // Insert in the registration cache
-
-    reg_cache_insert(l_state.rank, buf, len, 
-            mr->lkey, mr->rkey, mr);
+    if (mr) {
+        // Insert in the registration cache
+        reg_cache_insert(l_state.rank, buf, len, 
+                mr->lkey, mr->rkey, mr);
+    }
 
     return (void *)mr;
 }
@@ -616,6 +572,10 @@ int openib_put_nbi(void *src, void *dst, int bytes, int proc)
 
     // Search for remote key
     remote_reg = reg_cache_find(proc, dst, bytes);
+
+    if (!local_reg && l_state.armci_openib_use_dreg) {
+        local_reg = openib_register_memory(src, bytes);
+    }
 
     if (local_reg) {
         src_ptr = src;
@@ -658,6 +618,11 @@ int openib_get_nbi(void *src, void *dst, int bytes, int proc)
 
     // Search for remote key
     remote_reg = reg_cache_find(proc, src, bytes);
+    assert(remote_reg);
+
+    if (!local_reg && l_state.armci_openib_use_dreg) {
+        local_reg = openib_register_memory(dst, bytes);
+    }
 
     // Ensure that the registration entries are valid
     if (local_reg) {
@@ -810,6 +775,9 @@ int openib_initialize()
     nprocs = l_state.size;
     assert(l_state.world_comm);
 
+    // initialize the envs
+    openib_init_envs();
+
     //Initialize the registration cache
 
     reg_cache_init(nprocs, 0);
@@ -822,11 +790,6 @@ int openib_initialize()
     }
 
     if(create_cq()) {
-        release_resources();
-        exit(1);
-    }
-
-    if(reg_buf()) {
         release_resources();
         exit(1);
     }

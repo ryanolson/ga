@@ -258,7 +258,8 @@ check_PROGRAMS = ma/testc$(EXEEXT) ma/test-coalesce$(EXEEXT) \
 @ARMCI_SRC_DIR_PORTALS_TRUE@am__append_36 = -I$(top_srcdir)/armci/src-portals
 @ARMCI_SRC_DIR_GEMINI_TRUE@am__append_37 = -I$(top_srcdir)/armci/src-gemini
 @ARMCI_SRC_DIR_OPENIB_TRUE@am__append_38 = -I$(top_srcdir)/armci/src-openib
-@ARMCI_SRC_DIR_SRC_TRUE@am__append_39 = -I$(top_srcdir)/armci/src/include
+@ARMCI_SRC_DIR_MPI_TRUE@am__append_39 = -I$(top_srcdir)/armci/src-mpi
+@ARMCI_SRC_DIR_SRC_TRUE@am__append_40 = -I$(top_srcdir)/armci/src/include
 TESTS = $(am__EXEEXT_13) $(am__EXEEXT_14)
 XFAIL_TESTS = $(am__EXEEXT_15) $(am__EXEEXT_16)
 subdir = .
@@ -2652,8 +2653,9 @@ AM_CPPFLAGS = $(SCALAPACK_CPPFLAGS) $(LAPACK_CPPFLAGS) \
 	-I$(top_srcdir)/pario/sf $(am__append_33) \
 	-I$(top_build_prefix)gparrays/src -I$(top_srcdir)/gparrays/src \
 	$(am__append_36) $(am__append_37) $(am__append_38) \
-	$(am__append_39) -I$(top_build_prefix)armci/gaf2c \
-	-I$(top_srcdir)/armci/gaf2c -I$(top_srcdir)/armci/tcgmsg
+	$(am__append_39) $(am__append_40) \
+	-I$(top_build_prefix)armci/gaf2c -I$(top_srcdir)/armci/gaf2c \
+	-I$(top_srcdir)/armci/tcgmsg
 AM_LDFLAGS = $(SCALAPACK_LDFLAGS) $(LAPACK_LDFLAGS) $(BLAS_LDFLAGS) \
 	$(GA_MP_LDFLAGS) $(ARMCI_NETWORK_LDFLAGS) $(am__append_1)
 FLDFLAGS = $(SCALAPACK_LDFLAGS) $(LAPACK_LDFLAGS) $(BLAS_LDFLAGS) \

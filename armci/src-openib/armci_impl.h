@@ -27,6 +27,7 @@ typedef struct {
     // Number of outstanding data transfers
     unsigned long num_outstanding;
 
+    int armci_openib_use_dreg;
 } local_state;
 
 extern local_state l_state;

@@ -317,7 +317,6 @@ void armci_msg_reduce_scope(int scope, void *x, int n, char *op, int type)
 
 void armci_msg_gop_scope(int scope, void *x, int n, char* op, int type)
 {
-    assert(SCOPE_ALL == scope);
     do_gop(x, n, op, type, get_default_comm());
 }
 

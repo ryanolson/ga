@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     for (i = 0; i < LOOP; i++) {
       myptrs[k][me][i] = me + 0.414;
     }
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
     for (i = 0; i < LOOP; i++) {
       ARMCI_Get(myptrs[k][(me+1)%nprocs] + i, myptrs[k][me] + i, sizeof(double), (me + 1) % nprocs);
       /*if(myptrs[k][me][i]!=0.414+(me+1)%nprocs)ARMCI_Error("errr",myptrs[k][me][i]);*/
@@ -56,12 +56,12 @@ int main(int argc, char **argv)
     }
     printf("\nNb Get Latency=%f Nb Wait=%f\n", 1e6 * tnbget / LOOP, 1e6 * tnbwait / LOOP);
     fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
+    ARMCI_Barrier();
   }
   for (k = 0; k < 10; k++) {
     ARMCI_Free(myptrs[k][me]);
   }
-  MPI_Barrier(MPI_COMM_WORLD);
+  ARMCI_Barrier();
   ARMCI_Finalize();
   ARMCI_Finalize();
   MPI_Finalize();

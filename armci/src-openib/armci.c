@@ -109,6 +109,7 @@ int ARMCI_Malloc_group(void **ptrs, armci_size_t size, ARMCI_Group *group)
 
     /* allocate and register the user level buffer */
     ptrs[comm_rank] = _PARMCI_Malloc_local(sizeof(char)*max_size, &local_rkey_buf);
+    assert(local_rkey_buf);
 
     /* exchange buffer address */
     /* @TODO: Consider usijng MPI_IN_PLACE? */
@@ -210,11 +211,23 @@ static void *_PARMCI_Malloc_local(armci_size_t size, void **rinfo)
 
     /* register the buffer and check the return info */
     *rinfo = ARMCID_register_memory(ptr, size);
-    assert(*rinfo);
 
     return ptr;
 }
 
+// recursively find individual regions which can be registered
+void recursive_reg(void *ptr, armci_size_t size)
+{
+    if (size <= sc_page_size)
+        return;
+
+    if (ARMCID_register_memory(ptr, size))
+        return;
+    else {
+        recursive_reg(ptr, size / 2);
+        recursive_reg(ptr + size /2, size / 2);
+    } 
+}
 
 void *PARMCI_Malloc_local(armci_size_t size)
 {
@@ -223,6 +236,12 @@ void *PARMCI_Malloc_local(armci_size_t size)
     
     ptr = _PARMCI_Malloc_local(size, &rinfo);
 
+    int reg_size = size;
+
+    if (!rinfo) {
+        // registration failed
+        recursive_reg(ptr, size);
+    }
     return ptr;
 }
 

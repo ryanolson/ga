@@ -27,11 +27,17 @@ int ARMCID_deregister_memory(void *buf)
 
 int ARMCID_put_nbi(void *src, void *dst, int bytes, int proc)
 {
+    if (proc == l_state.rank) 
+        return memcpy(dst, src, bytes);
+
     return openib_put_nbi(src, dst, bytes, proc);
 }
 
 int ARMCID_get_nbi(void *src, void *dst, int bytes, int proc)
 {
+    if (proc == l_state.rank)
+        return memcpy(dst, src, bytes);
+
     return openib_get_nbi(src, dst, bytes, proc);
 }
 

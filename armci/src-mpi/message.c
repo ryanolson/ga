@@ -111,8 +111,41 @@ static void do_abs(void *x, int n, int type)
 }
 
 
-static void do_gop(void *x, int n, char* op, int type, MPI_Comm comm)
+static MPI_Comm get_comm(ARMCI_Group *group)
 {
+    ARMCI_iGroup *igroup = armci_get_igroup_from_group(group);
+    assert(igroup);
+    return igroup->comm;
+}
+
+
+static ARMCI_Group get_default_group()
+{
+    ARMCI_Group group;
+    ARMCI_Group_get_default(&group);
+    return group;
+}
+
+
+static MPI_Comm get_default_comm()
+{
+    ARMCI_Group group;
+    ARMCI_Group_get_default(&group);
+    return get_comm(&group);
+}
+
+
+static int get_default_rank()
+{
+    int rank;
+    MPI_Comm_rank(get_default_comm(), &rank);
+    return rank;
+}
+
+
+static void do_gop(void *x, int n, char* op, int type, ARMCI_Group group)
+{
+    MPI_Comm comm = get_comm(&group);
     int mpi_type_size = 0;
     MPI_Datatype mpi_type = MPI_DATATYPE_NULL;
     int rc = 0;
@@ -133,6 +166,7 @@ static void do_gop(void *x, int n, char* op, int type, MPI_Comm comm)
     result = malloc(n*mpi_type_size);
     assert(result);
 
+    PARMCI_Barrier_group(&group);
     rc = MPI_Allreduce(x, result, n, mpi_type, mpi_op, comm); 
     assert(rc == MPI_SUCCESS);
 
@@ -141,33 +175,10 @@ static void do_gop(void *x, int n, char* op, int type, MPI_Comm comm)
 }
 
 
-static MPI_Comm get_comm(ARMCI_Group *group)
-{
-    ARMCI_iGroup *igroup = armci_get_igroup_from_group(group);
-    assert(igroup);
-    return igroup->comm;
-}
-
-
-static MPI_Comm get_default_comm()
-{
-    ARMCI_Group group;
-    ARMCI_Group_get_default(&group);
-    return get_comm(&group);
-}
-
-
-static int get_default_rank()
-{
-    int rank;
-    MPI_Comm_rank(get_default_comm(), &rank);
-    return rank;
-}
-
-
 void armci_msg_bcast(void *buf, int len, int root)
 {
     assert(buf != NULL);
+    PARMCI_Barrier();
     MPI_Bcast(buf, len, MPI_BYTE, root, get_default_comm());
 }
 
@@ -233,6 +244,7 @@ void armci_msg_sel_scope(int scope, void *x, int n, char* op, int type, int cont
         } in, out;                                                          \
         in.val = *((C_TYPE*)x);                                             \
         in.rank = get_default_rank();                                       \
+        PARMCI_Barrier();                                                   \
         MPI_Allreduce(&in, &out, 1, MPI_TYPE, mpi_op, get_default_comm());  \
         armci_msg_bcast(x, n, out.rank);                                    \
     }                                                                       \
@@ -251,7 +263,7 @@ void armci_msg_sel_scope(int scope, void *x, int n, char* op, int type, int cont
 
 void armci_msg_bcast_scope(int scope, void* buffer, int len, int root)
 {
-    assert(SCOPE_ALL == scope);
+    //assert(SCOPE_ALL == scope);
     armci_msg_bcast(buffer, len, root);
 }
 
@@ -264,38 +276,67 @@ void armci_msg_brdcst(void* buffer, int len, int root)
 
 void armci_msg_snd(int tag, void* buffer, int len, int to)
 {
-    //MPI_Send(buffer, len, MPI_CHAR, to, tag, get_default_comm());
-    MPI_Send(buffer, len, MPI_CHAR, to, tag, l_state.world_comm);
+    MPI_Request request;
+    MPI_Status status;
+    int flag = 0;
+    int rc;
+
+    assert(ARMCI_TAG != tag);
+    rc = MPI_Isend(buffer, len, MPI_CHAR, to, tag, l_state.world_comm,
+            &request);
+    assert(MPI_SUCCESS == rc);
+    do {
+        MPI_Test(&request, &flag, &status);
+        assert(MPI_SUCCESS == rc);
+        armci_make_progress();
+    } while (!flag);
 }
 
 
-void armci_msg_rcv(int tag, void* buffer, int buflen, int *msglen, int from)
+void armci_msg_rcv(int tag, void* buffer, int len, int *msglen, int from)
 {
+    MPI_Request request;
     MPI_Status status;
-    //MPI_Recv(buffer, buflen, MPI_CHAR, from, tag, get_default_comm(), &status);
-    MPI_Recv(buffer, buflen, MPI_CHAR, from, tag, l_state.world_comm, &status);
+    int flag = 0;
+    int rc;
+
+    assert(ARMCI_TAG != tag);
+    rc = MPI_Irecv(buffer, len, MPI_CHAR, from, tag, l_state.world_comm,
+            &request);
+    assert(MPI_SUCCESS == rc);
+    do {
+        MPI_Test(&request, &flag, &status);
+        assert(MPI_SUCCESS == rc);
+        armci_make_progress();
+    } while (!flag);
+
     if(msglen) {
-        MPI_Get_count(&status, MPI_CHAR, msglen);
+        rc = MPI_Get_count(&status, MPI_CHAR, msglen);
+        assert(MPI_SUCCESS == rc);
     }
 }
 
 
-int armci_msg_rcvany(int tag, void* buffer, int buflen, int *msglen)
+int armci_msg_rcvany(int tag, void* buffer, int len, int *msglen)
 {
-    int ierr;
+    MPI_Request request;
     MPI_Status status;
+    int flag;
+    int rc;
 
-    assert(0);
-    ierr = MPI_Recv(buffer, buflen, MPI_BYTE, MPI_ANY_SOURCE, tag,
-            get_default_comm(), &status);
-    if(ierr != MPI_SUCCESS) {
-        armci_msg_abort(-1);
-    }
+    assert(ARMCI_TAG != tag);
+    rc = MPI_Irecv(buffer, len, MPI_CHAR, MPI_ANY_SOURCE, tag,
+            l_state.world_comm, &request);
+    assert(MPI_SUCCESS == rc);
+    do {
+        MPI_Test(&request, &flag, &status);
+        assert(MPI_SUCCESS == rc);
+        armci_make_progress();
+    } while (!flag);
 
     if(msglen) {
-        if(MPI_SUCCESS != MPI_Get_count(&status, MPI_CHAR, msglen)) {
-            armci_msg_abort(-1);
-        }
+        rc = MPI_Get_count(&status, MPI_CHAR, msglen);
+        assert(MPI_SUCCESS == rc);
     }
 
     return (int)status.MPI_SOURCE;
@@ -304,51 +345,51 @@ int armci_msg_rcvany(int tag, void* buffer, int buflen, int *msglen)
 
 void armci_msg_reduce(void *x, int n, char *op, int type)
 {
-    do_gop(x, n, op, type, get_default_comm());
+    do_gop(x, n, op, type, get_default_group());
 }
 
 
 void armci_msg_reduce_scope(int scope, void *x, int n, char *op, int type)
 {
-    assert(SCOPE_ALL == scope);
-    do_gop(x, n, op, type, get_default_comm());
+    //assert(SCOPE_ALL == scope);
+    do_gop(x, n, op, type, get_default_group());
 }
 
 
 void armci_msg_gop_scope(int scope, void *x, int n, char* op, int type)
 {
-    assert(SCOPE_ALL == scope);
-    do_gop(x, n, op, type, get_default_comm());
+    //assert(SCOPE_ALL == scope);
+    do_gop(x, n, op, type, get_default_group());
 }
 
 
 void armci_msg_igop(int *x, int n, char* op)
 {
-    do_gop(x, n, op, ARMCI_INT, get_default_comm());
+    do_gop(x, n, op, ARMCI_INT, get_default_group());
 }
 
 
 void armci_msg_lgop(long *x, int n, char* op)
 {
-    do_gop(x, n, op, ARMCI_LONG, get_default_comm());
+    do_gop(x, n, op, ARMCI_LONG, get_default_group());
 }
 
 
 void armci_msg_llgop(long long *x, int n, char* op)
 {
-    do_gop(x, n, op, ARMCI_LONG_LONG, get_default_comm());
+    do_gop(x, n, op, ARMCI_LONG_LONG, get_default_group());
 }
 
 
 void armci_msg_fgop(float *x, int n, char* op)
 {
-    do_gop(x, n, op, ARMCI_FLOAT, get_default_comm());
+    do_gop(x, n, op, ARMCI_FLOAT, get_default_group());
 }
 
 
 void armci_msg_dgop(double *x, int n, char* op)
 {
-    do_gop(x, n, op, ARMCI_DOUBLE, get_default_comm());
+    do_gop(x, n, op, ARMCI_DOUBLE, get_default_group());
 }
 
 
@@ -362,13 +403,14 @@ void armci_exchange_address(void *ptr_ar[], int n)
 
 void parmci_msg_barrier()
 {
+    PARMCI_Barrier();
     MPI_Barrier(get_default_comm());
 }
 
 
 void armci_msg_bintree(int scope, int* Root, int *Up, int *Left, int *Right)
 {
-    assert(SCOPE_ALL == scope);
+    //assert(SCOPE_ALL == scope);
     assert(0);
 }
 
@@ -474,38 +516,38 @@ void armci_msg_clus_dgop(double *x, int n, char* op)
 
 void armci_msg_group_gop_scope(int scope, void *x, int n, char* op, int type, ARMCI_Group *group)
 {
-    assert(SCOPE_ALL == scope);
-    do_gop(x, n, op, type, get_comm(group));
+    //assert(SCOPE_ALL == scope);
+    do_gop(x, n, op, type, *group);
 }
 
 
 void armci_msg_group_igop(int *x, int n, char* op, ARMCI_Group *group)
 {
-    do_gop(x, n, op, ARMCI_INT, get_comm(group));
+    do_gop(x, n, op, ARMCI_INT, *group);
 }
 
 
 void armci_msg_group_lgop(long *x, int n, char* op, ARMCI_Group *group)
 {
-    do_gop(x, n, op, ARMCI_LONG, get_comm(group));
+    do_gop(x, n, op, ARMCI_LONG, *group);
 }
 
 
 void armci_msg_group_llgop(long long *x, int n, char* op, ARMCI_Group *group)
 {
-    do_gop(x, n, op, ARMCI_LONG_LONG, get_comm(group));
+    do_gop(x, n, op, ARMCI_LONG_LONG, *group);
 }
 
 
 void armci_msg_group_fgop(float *x, int n, char* op, ARMCI_Group *group)
 {
-    do_gop(x, n, op, ARMCI_FLOAT, get_comm(group));
+    do_gop(x, n, op, ARMCI_FLOAT, *group);
 }
 
 
 void armci_msg_group_dgop(double *x, int n,char* op, ARMCI_Group *group)
 {
-    do_gop(x, n, op, ARMCI_DOUBLE, get_comm(group));
+    do_gop(x, n, op, ARMCI_DOUBLE, *group);
 }
 
 
@@ -536,13 +578,15 @@ void armci_exchange_address_grp(void *ptr_arr[], int n, ARMCI_Group *group)
 
 void parmci_msg_group_barrier(ARMCI_Group *group)
 {
+    PARMCI_Barrier_group(group);
     MPI_Barrier(get_comm(group));
 }
 
 
 void armci_msg_group_bcast_scope(int scope, void *buf, int len, int root, ARMCI_Group *group)
 {
-    assert(SCOPE_ALL == scope);
+    //assert(SCOPE_ALL == scope);
+    PARMCI_Barrier_group(group);
     MPI_Bcast(buf, len, MPI_BYTE, root, get_comm(group));
 }
 

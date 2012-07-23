@@ -1167,6 +1167,9 @@ endif
 if ARMCI_SRC_DIR_OPENIB
 AM_CPPFLAGS += -I$(top_srcdir)/armci/src-openib
 endif
+if ARMCI_SRC_DIR_MPI
+AM_CPPFLAGS += -I$(top_srcdir)/armci/src-mpi
+endif
 if ARMCI_SRC_DIR_SRC
 AM_CPPFLAGS += -I$(top_srcdir)/armci/src/include
 endif
