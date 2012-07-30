@@ -486,6 +486,9 @@
 /* TODO */
 #undef MPI_SPAWN
 
+/* TODO */
+#undef MPI_TS
+
 /* Use MPI for messaging */
 #undef MSG_COMMS_MPI
 

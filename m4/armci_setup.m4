@@ -74,6 +74,9 @@ AS_CASE([$ga_armci_network],
     AC_DEFINE([SERVER_THREAD], [1], [TODO])
     AC_DEFINE([MPI_MT], [1], [TODO])
     ],
+[MPI_MT], [
+    AC_DEFINE([MPI_TS], [1], [TODO])
+    ],
 [MPI_SPAWN], [
     AC_DEFINE([DATA_SERVER], [1], [TODO])
     AC_DEFINE([MPI_SPAWN], [1], [TODO])

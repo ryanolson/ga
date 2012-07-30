@@ -1335,9 +1335,19 @@ void PARMCI_Barrier_group(ARMCI_Group *armci_group)
     memset(response_received_mask, 0, sizeof(char) * group_size);
 
     /* send out barrier requests to all procs in default group */
-    for (group_proc=0; group_proc<group_size; ++group_proc) {
+#define USE_RING 1
+#if USE_RING
+    int ring_proc;
+    for (ring_proc=0; ring_proc<group_size; ++ring_proc)
+#else
+    for (group_proc=0; group_proc<group_size; ++group_proc)
+#endif
+    {
         int world_rank = -1;
         header_t *header = NULL;
+#if USE_RING
+        group_proc = (group_rank+ring_proc)%group_size;
+#endif
 
         status = MPI_Group_translate_ranks(
                 mpi_group_default, 1, &group_proc,

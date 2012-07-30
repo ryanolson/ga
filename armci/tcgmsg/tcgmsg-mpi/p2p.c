@@ -116,7 +116,9 @@ void WAITCOM_(Integer *nodesel)
         do {
             ierr = MPI_Test(&msg_q[i].request, &flag, &status);
             tcgmsg_test_statusM("WAITCOM:", ierr);
+#if MPI_TS
             armci_make_progress();
+#endif
         } while (!flag);
     }
     n_in_msg_q = 0;

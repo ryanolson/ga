@@ -34290,6 +34290,12 @@ $as_echo "#define SERVER_THREAD 1" >>confdefs.h
 $as_echo "#define MPI_MT 1" >>confdefs.h
 
      ;; #(
+  MPI_MT) :
+
+
+$as_echo "#define MPI_TS 1" >>confdefs.h
+
+     ;; #(
   MPI_SPAWN) :
 
 
