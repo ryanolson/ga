@@ -22,6 +22,10 @@
 #include "parmci.h"
 #include "reg_cache.h"
 
+/* Cray */
+//include "shmem_congestion.h"
+
+
 #define DEBUG 0
 
 
@@ -1756,7 +1760,7 @@ static void dmapp_initialize(void)
     requested_attrs.offload_threshold = ARMCI_DMAPP_OFFLOAD_THRESHOLD;
 
     /* Specifies the type of routing to be used. Applies to RMA requests with
-     * PUT semantics and all AMOs. The default is DMAPP_ROUTING_DETERMINISTIC.
+     * PUT semantics and all AMOs. The default is DMAPP_ROUTING_ADAPTIVE.
      * The value can be specified at any time. Note that
      * DMAPP_ROUTING_IN_ORDER guarantees the requests arrive in order and may
      * result in poor performance.  Valid settings are:
@@ -1800,7 +1804,7 @@ static void dmapp_initialize(void)
      * - DMAPP_PI_ORDERING_STRICT   Strict PI (P_PASS_PW=0, NP_PASS_PW=0)
      * - DMAPP_PI_ORDERING_DEFAULT  Default GNI PI (P_PASS_PW=0, NP_PASS_PW=1)
      * - DMAPP_PI_ORDERING_RELAXED  Relaxed PI ordering (P_PASS_PW=1, NP_PASS_PW=1) */
-    requested_attrs.PI_ordering = DMAPP_PI_ORDERING_STRICT;
+    requested_attrs.PI_ordering = DMAPP_PI_ORDERING_RELAXED;
 
     // initialize    
     status = dmapp_init_ext(&requested_attrs, &actual_attrs);
