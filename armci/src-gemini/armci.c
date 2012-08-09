@@ -23,10 +23,16 @@
 #include "reg_cache.h"
 
 /* Cray */
-//include "shmem_congestion.h"
-
+#include "dmapp_lock.h"
+#define DMAPP_LOCK 1
 
 #define DEBUG 0
+
+
+/* dmapp locks */
+#if DMAPP_LOCK
+static dmapp_lock_handle_t * armci_locks = NULL;
+#endif
 
 
 /* exported state */
@@ -317,6 +323,10 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
 
 static void dmapp_network_lock(int proc)
 {
+#if DMAPP_LOCK
+    dmapp_lock_handle_t tgt_lock = armci_locks[proc];
+    dmapp_lock_acquire( tgt_lock, 0 );
+#else
     int dmapp_status;
     reg_entry_t *dst_reg= reg_cache_find(proc, 
             l_state.atomic_lock_buf[proc], sizeof(long));
@@ -332,11 +342,16 @@ static void dmapp_network_lock(int proc)
         assert(dmapp_status == DMAPP_RC_SUCCESS);
     }
     while(*(l_state.local_lock_buf) != 0);
+#endif
 }
 
 
 static void dmapp_network_unlock(int proc)
 {
+# if DMAPP_LOCK
+    dmapp_lock_handle_t tgt_lock = armci_locks[proc];
+    dmapp_lock_release( tgt_lock, 0 );
+#else
     int dmapp_status;
     reg_entry_t *dst_reg= reg_cache_find(proc, 
             l_state.atomic_lock_buf[proc], sizeof(long));
@@ -350,6 +365,7 @@ static void dmapp_network_unlock(int proc)
                 proc, l_state.rank + 1, 0);
         assert(dmapp_status == DMAPP_RC_SUCCESS);
     } while (*(l_state.local_lock_buf) != l_state.rank + 1);
+#endif
 }
 
 
@@ -858,16 +874,25 @@ int PARMCI_Free_local(void *ptr)
 
 static void destroy_dmapp_locks(void)
 {
+#if DMAPP_LOCK
+    dmapp_lock_free( armci_locks, l_state.size, 0);
+    armci_locks = NULL;
+#else
     if (l_state.local_lock_buf)
             PARMCI_Free_local(l_state.local_lock_buf);
 
     if (l_state.atomic_lock_buf)
             PARMCI_Free(l_state.atomic_lock_buf[l_state.rank]);
+#endif
 }
 
 
 static void create_dmapp_locks(void)
 {
+#if DMAPP_LOCK
+    armci_locks = (dmapp_lock_handle_t *) malloc( l_state.size * sizeof(dmapp_lock_handle_t) );
+    dmapp_lock_alloc(armci_locks, l_state.size, 0);
+#else
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
     assert(l_state.local_lock_buf);
 
@@ -878,6 +903,7 @@ static void create_dmapp_locks(void)
 
     *(long *)(l_state.atomic_lock_buf[l_state.rank]) = 0;
     *(long *)(l_state.local_lock_buf) = 0;
+#endif
 
     MPI_Barrier(l_state.world_comm);
 }
