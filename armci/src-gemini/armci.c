@@ -23,15 +23,18 @@
 #include "reg_cache.h"
 
 /* Cray */
-#include "dmapp_lock.h"
-#define DMAPP_LOCK 1
+#define HAVE_DMAPP_LOCK 1
 
 #define DEBUG 0
 
 
-/* dmapp locks */
-#if DMAPP_LOCK
-static dmapp_lock_handle_t * armci_locks = NULL;
+#if HAVE_DMAPP_LOCK
+// ARMCI_MAX_LOCKS mirrors the default DMAPP_MAX_LOCKS limit
+// Larger values of ARMCI_MAX_LOCKS will require DMAPP_MAX_LOCKS be set at runtime.
+// DMAPP_MAX_LOCKS has a maxium value of 1023
+#define ARMCI_MAX_LOCKS 128  
+static dmapp_lock_desc_t   lock_desc[ARMCI_MAX_LOCKS];
+static dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS];
 #endif
 
 
@@ -323,11 +326,11 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
 
 static void dmapp_network_lock(int proc)
 {
-#if DMAPP_LOCK
-    dmapp_lock_handle_t tgt_lock = armci_locks[proc];
-    dmapp_lock_acquire( tgt_lock, 0 );
-#else
     int dmapp_status;
+
+#if HAVE_DMAPP_LOCK
+    dmapp_lock_acquire( &lock_desc[0], &(l_state.job.data_seg), proc, 0, &lock_handle[0]);
+#else
     reg_entry_t *dst_reg= reg_cache_find(proc, 
             l_state.atomic_lock_buf[proc], sizeof(long));
 
@@ -348,11 +351,11 @@ static void dmapp_network_lock(int proc)
 
 static void dmapp_network_unlock(int proc)
 {
-# if DMAPP_LOCK
-    dmapp_lock_handle_t tgt_lock = armci_locks[proc];
-    dmapp_lock_release( tgt_lock, 0 );
-#else
     int dmapp_status;
+
+# if HAVE_DMAPP_LOCK
+    dmapp_lock_release( lock_handle[0], 0 );
+#else
     reg_entry_t *dst_reg= reg_cache_find(proc, 
             l_state.atomic_lock_buf[proc], sizeof(long));
 
@@ -875,8 +878,6 @@ int PARMCI_Free_local(void *ptr)
 static void destroy_dmapp_locks(void)
 {
 #if DMAPP_LOCK
-    dmapp_lock_free( armci_locks, l_state.size, 0);
-    armci_locks = NULL;
 #else
     if (l_state.local_lock_buf)
             PARMCI_Free_local(l_state.local_lock_buf);
@@ -890,8 +891,7 @@ static void destroy_dmapp_locks(void)
 static void create_dmapp_locks(void)
 {
 #if DMAPP_LOCK
-    armci_locks = (dmapp_lock_handle_t *) malloc( l_state.size * sizeof(dmapp_lock_handle_t) );
-    dmapp_lock_alloc(armci_locks, l_state.size, 0);
+    bzero(lock_desc, sizeof(lock_desc));
 #else
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
     assert(l_state.local_lock_buf);
