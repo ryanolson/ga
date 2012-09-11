@@ -1048,3 +1048,26 @@ DoublePrecision pnga_wtime()
 #endif
     return (DoublePrecision)wtime; 
 }
+
+#pragma weak pdspgv_ = ghost_pdspgv_
+void ghost_pdspgv_(void* arg1, void* arg2, void* arg3, void* arg4,
+                   void* arg5, void* arg6,
+                   void* arg7, void* arg8,
+                   void* arg9,
+                   void* arg10, void* arg11,
+                   void* arg12, void* arg13,
+                   void* arg14, void* arg15, void* arg16) { return; }
+
+#pragma weak pdspev_ = ghost_pdspev_
+void ghost_pdspev_(void* arg1, void* arg2, void* arg3, void* arg4,
+                   void* arg5, void* arg6,
+                   void* arg7, void* arg8,
+                   void* arg9,
+                   void* arg10, void* arg11,
+                   void* arg12, void* arg13) { return; }
+
+#pragma weak fmemreq_ = ghost_fmemreq_
+void ghost_fmemreq_(void* arg1, void* arg2, void* arg3, void* arg4,
+                    void* arg5, void* arg6,
+                    void* arg7, void* arg8,
+                    void* arg9) { return; }

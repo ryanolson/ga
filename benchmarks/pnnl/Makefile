@@ -1,4 +1,4 @@
-  GA_CONFIG := # e.g. /path/to/ga/install/bin/ga-config
+  GA_CONFIG := /lus/dc_esfs1/ryan/ga/local/bin/ga-config
 ifneq ($(GA_CONFIG),)
 CPPFLAGS := $(shell $(GA_CONFIG) --cppflags)
   FFLAGS := $(shell $(GA_CONFIG) --fflags)
