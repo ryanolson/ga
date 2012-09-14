@@ -35,6 +35,8 @@
 #define ARMCI_MAX_LOCKS 128  
 static dmapp_lock_desc_t   lock_desc[ARMCI_MAX_LOCKS];
 static dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS];
+static int use_locks_on_get = 0;
+static int use_locks_on_put = 0;
 #endif
 
 
@@ -402,6 +404,10 @@ int PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
         dst_bunit[i] = dst_bunit[i-1] * count[i-1];
     }
 
+#if HAVE_DMAPP_LOCK
+    if(use_locks_on_get) dmapp_network_lock(proc);
+#endif
+
     /* index mangling */
     for(i=0; i<n1dim; i++) {
         src_idx = 0;
@@ -429,6 +435,10 @@ int PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
         PARMCI_Put_nbi((char *)src_ptr + src_idx, 
                 (char *)dst_ptr + dst_idx, count[0], proc);
     }
+
+#if HAVE_DMAPP_LOCK
+    if(use_locks_on_get) dmapp_network_lock(proc);
+#endif
 
     PARMCI_WaitProc(proc);
 
@@ -466,6 +476,10 @@ int PARMCI_GetS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
         dst_bunit[i] = dst_bunit[i-1] * count[i-1];
     }
 
+#if HAVE_DMAPP_LOCK
+    if(use_locks_on_get) dmapp_network_lock(proc);
+#endif
+
     for(i=0; i<n1dim; i++) {
         src_idx = 0;
         for(j=1; j<=stride_levels; j++) {
@@ -493,7 +507,11 @@ int PARMCI_GetS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
         PARMCI_Get_nbi((char *)src_ptr + src_idx, 
                 (char *)dst_ptr + dst_idx, count[0], proc);
     }
-    
+
+#if HAVE_DMAPP_LOCK
+    if(use_locks_on_get) dmapp_network_unlock(proc);
+#endif
+
     PARMCI_WaitProc(proc);
     
     return 0;
@@ -528,6 +546,11 @@ int PARMCI_AccS(int datatype, void *scale,
     int sizetogetput;
     void *get_buf;
     long k = 0;
+
+#if HAVE_DMAPP_LOCK
+    int lock_on_get = use_locks_on_get;
+    int lock_on_put = use_locks_on_put;
+#endif
 
     /* number of n-element of the first dimension */
     n1dim = 1;
@@ -639,6 +662,11 @@ int PARMCI_AccS(int datatype, void *scale,
 
     // ungrab the lock
     dmapp_network_unlock(proc);
+
+#if HAVE_DMAPP_LOCK
+    use_locks_on_get = lock_on_get;
+    use_locks_on_put = lock_on_put;
+#endif
 
     if (sizetogetput > l_state.acc_buf_len)
         my_free(get_buf);
@@ -1650,6 +1678,15 @@ static void check_envs(void)
     else {
         l_state.dmapp_routing = DMAPP_ROUTING_ADAPTIVE;
     }
+
+#if HAVE_DMAPP_LOCK
+    if(getenv("ARMCI_DMAPP_LOCK_ON_GET")) {
+       use_locks_on_get = atoi(getenv("ARMCI_DMAPP_LOCK_ON_GET"));
+    }
+    if(getenv("ARMCI_DMAPP_LOCK_ON_PUT")) {
+       use_locks_on_put = atoi(getenv("ARMCI_DMAPP_LOCK_ON_PUT"));
+    }
+#endif
 
 #if HAVE_LIBHUGETLBFS
 
