@@ -437,7 +437,7 @@ int PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
     }
 
 #if HAVE_DMAPP_LOCK
-    if(use_locks_on_put) dmapp_network_lock(proc);
+    if(use_locks_on_put) dmapp_network_unlock(proc);
 #endif
 
     PARMCI_WaitProc(proc);
