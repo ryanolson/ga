@@ -1058,6 +1058,19 @@ void ghost_pdspgv_(void* arg1, void* arg2, void* arg3, void* arg4,
                    void* arg12, void* arg13,
                    void* arg14, void* arg15, void* arg16) 
 { 
+     pdspgv( arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, 
+             arg10, arg11, arg12, arg13, arg14, arg15, arg16 );
+}
+
+#pragma weak pdspgv = ghost_pdspgv
+void ghost_pdspgv(void* arg1, void* arg2, void* arg3, void* arg4,
+                   void* arg5, void* arg6,
+                   void* arg7, void* arg8,
+                   void* arg9,
+                   void* arg10, void* arg11,
+                   void* arg12, void* arg13,
+                   void* arg14, void* arg15, void* arg16) 
+{ 
      fprintf(stdout,"pdspgv_ is not implemented in this GA build.\nThis function is provided by NWChem. If you are running NWChem, check the link order and ensure pdspgv_ does not come from the GA library.");
      fflush(stdout);
      abort();
@@ -1065,6 +1078,20 @@ void ghost_pdspgv_(void* arg1, void* arg2, void* arg3, void* arg4,
 
 #pragma weak pdspev_ = ghost_pdspev_
 void ghost_pdspev_(void* arg1, void* arg2, void* arg3, void* arg4,
+                   void* arg5, void* arg6,
+                   void* arg7, void* arg8,
+                   void* arg9,
+                   void* arg10, void* arg11,
+                   void* arg12, void* arg13)
+{
+     pdspev( arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, 
+             arg10, arg11, arg12, arg13 );
+}
+
+
+
+#pragma weak pdspev = ghost_pdspev
+void ghost_pdspev(void* arg1, void* arg2, void* arg3, void* arg4,
                    void* arg5, void* arg6,
                    void* arg7, void* arg8,
                    void* arg9,
