@@ -405,7 +405,7 @@ int PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
     }
 
 #if HAVE_DMAPP_LOCK
-    if(use_locks_on_get) dmapp_network_lock(proc);
+    if(use_locks_on_put) dmapp_network_lock(proc);
 #endif
 
     /* index mangling */
@@ -437,7 +437,7 @@ int PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
     }
 
 #if HAVE_DMAPP_LOCK
-    if(use_locks_on_get) dmapp_network_lock(proc);
+    if(use_locks_on_put) dmapp_network_unlock(proc);
 #endif
 
     PARMCI_WaitProc(proc);
@@ -550,6 +550,8 @@ int PARMCI_AccS(int datatype, void *scale,
 #if HAVE_DMAPP_LOCK
     int lock_on_get = use_locks_on_get;
     int lock_on_put = use_locks_on_put;
+    use_locks_on_get = 0;
+    use_locks_on_put = 0;
 #endif
 
     /* number of n-element of the first dimension */
@@ -1682,9 +1684,17 @@ static void check_envs(void)
 #if HAVE_DMAPP_LOCK
     if(getenv("ARMCI_DMAPP_LOCK_ON_GET")) {
        use_locks_on_get = atoi(getenv("ARMCI_DMAPP_LOCK_ON_GET"));
+       if(0 == l_state.rank) {
+          fprintf(stdout,"ARMCI_DMAPP_LOCK_ON_GET = %d\n",use_locks_on_get);
+          fflush(stdout);
+       }
     }
     if(getenv("ARMCI_DMAPP_LOCK_ON_PUT")) {
        use_locks_on_put = atoi(getenv("ARMCI_DMAPP_LOCK_ON_PUT"));
+       if(0 == l_state.rank) {
+          fprintf(stdout,"ARMCI_DMAPP_LOCK_ON_PUT = %d\n",use_locks_on_put);
+          fflush(stdout);
+       }
     }
 #endif
 
