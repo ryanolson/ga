@@ -56,9 +56,9 @@ static reg_return_t   seg_intersects(void *reg_addr, size_t reg_len,
 static reg_return_t   seg_contains(void *reg_addr, size_t reg_len,
                                    void *oth_addr, size_t oth_len);
 static reg_return_t   reg_entry_intersects(reg_entry_t *reg_entry,
-                                           void *buf, int len);
+                                           void *buf, size_t len);
 static reg_return_t   reg_entry_contains(reg_entry_t *reg_entry,
-                                         void *buf, int len);
+                                         void *buf, size_t len);
 static reg_return_t   dmapp_seg_intersects(dmapp_seg_desc_t first,
                                            dmapp_seg_desc_t second);
 static reg_return_t   dmapp_seg_contains(dmapp_seg_desc_t first,
@@ -191,7 +191,7 @@ seg_contains(void *reg_addr, size_t reg_len, void *oth_addr, size_t oth_len)
  * @return RR_SUCCESS on success
  */
 static reg_return_t
-reg_entry_intersects(reg_entry_t *reg_entry, void *buf, int len)
+reg_entry_intersects(reg_entry_t *reg_entry, void *buf, size_t len)
 {
     /* preconditions */
     assert(NULL != reg_entry);
@@ -218,7 +218,7 @@ reg_entry_intersects(reg_entry_t *reg_entry, void *buf, int len)
  * @return RR_SUCCESS on success
  */
 static reg_return_t
-reg_entry_contains(reg_entry_t *reg_entry, void *buf, int len)
+reg_entry_contains(reg_entry_t *reg_entry, void *buf, size_t len)
 {
     /* preconditions */
     assert(NULL != reg_entry);
@@ -391,7 +391,7 @@ reg_cache_destroy()
  * @return the reg cache entry, or NULL on failure
  */
 reg_entry_t*
-reg_cache_find(int rank, void *buf, int len)
+reg_cache_find(int rank, void *buf, size_t len)
 {
     reg_entry_t *entry = NULL;
     reg_entry_t *runner = NULL;
@@ -468,7 +468,7 @@ dmapp_cache_find(dmapp_seg_desc_t mr)
  * @return the reg cache entry, or NULL on failure
  */
 reg_entry_t*
-reg_cache_find_intersection(int rank, void *buf, int len)
+reg_cache_find_intersection(int rank, void *buf, size_t len)
 {
     reg_entry_t *entry = NULL;
     reg_entry_t *runner = NULL;
@@ -545,7 +545,7 @@ dmapp_cache_find_intersection(dmapp_seg_desc_t mr)
  * @return RR_SUCCESS on success
  */
 reg_entry_t*
-reg_cache_insert(int rank, void *buf, int len, dmapp_seg_desc_t mr)
+reg_cache_insert(int rank, void *buf, size_t len, dmapp_seg_desc_t mr)
 {
     reg_entry_t *node = NULL;
     dmapp_entry_t *dmapp_entry = NULL;
@@ -673,7 +673,7 @@ static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t mr)
 
     if (runner) {
         /* make sure it's an exact match */
-        assert(runner->mr.len == mr.len);
+        // assert(runner->mr.len == mr.len);
         /* increment ref count */
         ++(runner->count);
 #if DEBUG
