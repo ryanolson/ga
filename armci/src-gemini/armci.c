@@ -1295,7 +1295,15 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
         reg_entry_t *rem_reg = reg_cache_find(proc, prem, sizeof(long));
         assert(rem_reg);
         status = dmapp_afadd_qw(ploc, prem, &(rem_reg->mr), proc, extra);
-        assert(status == DMAPP_RC_SUCCESS);
+        if(status == DMAPP_RC_RESOURCE_ERROR) {
+           // the amo was never issued
+           dmapp_gsync_wait();
+           status = dmapp_afadd_qw(ploc, prem, &(rem_reg->mr), proc, extra);
+        }
+        if(status != DMAPP_RC_SUCCESS) {
+           printf("dmapp_afadd_qw failed with %d\n",status);
+           assert(status == DMAPP_RC_SUCCESS);
+        } 
 #else
         long tmp;
         dmapp_network_lock(proc);
