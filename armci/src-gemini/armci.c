@@ -1277,6 +1277,7 @@ int PARMCI_Same_node(int proc)
     return 0;
 }
 
+static long local_fadd;
 
 int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
 {
@@ -1294,16 +1295,18 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
 #if 1
         reg_entry_t *rem_reg = reg_cache_find(proc, prem, sizeof(long));
         assert(rem_reg);
-        status = dmapp_afadd_qw(ploc, prem, &(rem_reg->mr), proc, extra);
+        status = dmapp_afadd_qw(&local_fadd, prem, &(l_state.job.data_seg), proc, extra);
         if(status == DMAPP_RC_RESOURCE_ERROR) {
            // the amo was never issued
            dmapp_gsync_wait();
-           status = dmapp_afadd_qw(ploc, prem, &(rem_reg->mr), proc, extra);
+           status = dmapp_afadd_qw(&local_fadd, prem, &(l_state.job.data_seg), proc, extra);
         }
         if(status != DMAPP_RC_SUCCESS) {
            printf("dmapp_afadd_qw failed with %d\n",status);
            assert(status == DMAPP_RC_SUCCESS);
-        } 
+        }
+        long * lloc = (long *)ploc;
+        *lloc = local_fadd; 
 #else
         long tmp;
         dmapp_network_lock(proc);
