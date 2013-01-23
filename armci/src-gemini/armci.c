@@ -181,7 +181,10 @@ static void increment_total_outstanding(void)
     ++total_outstanding;
 
     if (total_outstanding == max_outstanding_nb) {
-        dmapp_gsync_wait();
+	dmapp_return_t status;
+
+        status = dmapp_gsync_wait();
+        assert(status == DMAPP_RC_SUCCESS);
         total_outstanding = 0;
     }
 }
@@ -272,7 +275,6 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     int type = DMAPP_BYTE;
     int failure_observed = 0;
     reg_entry_t *dst_reg = NULL;
-    reg_entry_t *src_reg = NULL;
 
     /* Corner case */
     if (proc == l_state.rank) {
@@ -298,8 +300,6 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     /* Find the dmapp seg desc */
     dst_reg = reg_cache_find(proc, src, bytes);
     assert(dst_reg);
-    
-    src_reg = reg_cache_find(l_state.rank, dst, bytes);
 
     status = dmapp_get_nbi(dst, src, &(dst_reg->mr),
             proc, nelems, type);
@@ -907,7 +907,7 @@ int PARMCI_Free_local(void *ptr)
 
 static void destroy_dmapp_locks(void)
 {
-#if DMAPP_LOCK
+#if HAVE_DMAPP_LOCK
 #else
     if (l_state.local_lock_buf)
             PARMCI_Free_local(l_state.local_lock_buf);
@@ -920,7 +920,7 @@ static void destroy_dmapp_locks(void)
 
 static void create_dmapp_locks(void)
 {
-#if DMAPP_LOCK
+#if HAVE_DMAPP_LOCK
     bzero(lock_desc, sizeof(lock_desc));
 #else
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
@@ -1277,13 +1277,18 @@ int PARMCI_Same_node(int proc)
     return 0;
 }
 
+/* static variables are automatically mapped in by DMAPP
+ * so using them as the target of AMOs can avoid a local
+ * register/deregister sequence
+ */
 static long local_fadd;
+static long local_swap;
 
 int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
 {
     int status;
     if (op == ARMCI_FETCH_AND_ADD) {
-        /* dmapp doesn't have atomic fadd for int */
+        /* Gemini dmapp doesn't have atomic fadd for int */
         int tmp;
         dmapp_network_lock(proc);
         PARMCI_Get(prem, ploc, sizeof(int), proc);
@@ -1292,32 +1297,17 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
         dmapp_network_unlock(proc);
     }
     else if (op == ARMCI_FETCH_AND_ADD_LONG) {
-#if 1
         reg_entry_t *rem_reg = reg_cache_find(proc, prem, sizeof(long));
         assert(rem_reg);
-        status = dmapp_afadd_qw(&local_fadd, prem, &(l_state.job.data_seg), proc, extra);
-        if(status == DMAPP_RC_RESOURCE_ERROR) {
-           // the amo was never issued
-           dmapp_gsync_wait();
-           status = dmapp_afadd_qw(&local_fadd, prem, &(l_state.job.data_seg), proc, extra);
-        }
+        status = dmapp_afadd_qw(&local_fadd, prem, &(rem_reg->mr), proc, extra);
         if(status != DMAPP_RC_SUCCESS) {
            printf("dmapp_afadd_qw failed with %d\n",status);
            assert(status == DMAPP_RC_SUCCESS);
         }
-        long * lloc = (long *)ploc;
-        *lloc = local_fadd; 
-#else
-        long tmp;
-        dmapp_network_lock(proc);
-        PARMCI_Get(prem, ploc, sizeof(long), proc);
-        tmp = *(long*)ploc + extra;
-        PARMCI_Put(&tmp, prem, sizeof(long), proc);
-        dmapp_network_unlock(proc);
-#endif
+        *(long*)ploc = local_fadd;
     }
     else if (op == ARMCI_SWAP) {
-        /* dmapp doesn't have atomic swap for int */
+        /* Gemini dmapp doesn't have atomic swap for int */
         int tmp;
         dmapp_network_lock(proc);
         PARMCI_Get(prem, &tmp, sizeof(int), proc);
@@ -1326,18 +1316,17 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
         *(int*)ploc = tmp;
     }
     else if (op == ARMCI_SWAP_LONG) {
-        /* dmapp has atomic cswap for long, but it's non-blocking */
-        long tmp;
-        dmapp_network_lock(proc);
-        PARMCI_Get(prem, &tmp, sizeof(long), proc);
-        PARMCI_Put(ploc, prem, sizeof(long), proc);
-        dmapp_network_unlock(proc);
-        *(long*)ploc = tmp;
+        reg_entry_t *rem_reg = reg_cache_find(proc, prem, sizeof(long));
+        assert(rem_reg);
+        /* Gemini does not support SWAP, so emulate it with the AFAX operation */
+        status = dmapp_afax_qw(&local_swap, prem, &(rem_reg->mr), proc,
+                               0 /* AND mask */, *(long *)ploc /* XOR mask */);
+        *(long*)ploc = local_swap;
     }
     else  {
         assert(0);
     }
-    
+
     return 0;
 }
 
