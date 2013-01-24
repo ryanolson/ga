@@ -539,8 +539,8 @@ dmapp_cache_find_intersection(dmapp_seg_desc_t mr)
  * @pre NULL != buf
  * @pre 0 <= len
  * @pre reg_cache_init() was previously called
- * @pre NULL == reg_cache_find(rank, buf, 0)
- * @pre NULL == reg_cache_find_intersection(rank, buf, 0)
+ * @pre NULL == reg_cache_find(rank, buf, len)
+ * @pre NULL == reg_cache_find_intersection(rank, buf, len)
  *
  * @return RR_SUCCESS on success
  */
@@ -599,7 +599,7 @@ reg_cache_insert(int rank, void *buf, size_t len, dmapp_seg_desc_t mr)
  * @pre 0 <= rank && rank < reg_nprocs
  * @pre NULL != buf
  * @pre reg_cache_init() was previously called
- * @pre NULL != reg_cache_find(rank, buf, 0)
+ * @pre NULL != reg_cache_find(rank, buf, 1)
  *
  * @return RR_SUCCESS on success
  *         RR_FAILURE otherwise
@@ -615,7 +615,7 @@ reg_cache_delete(int rank, void *buf)
     assert(NULL != reg_cache);
     assert(0 <= rank && rank < reg_nprocs);
     assert(NULL != buf);
-    assert(NULL != reg_cache_find(rank, buf, 0));
+    assert(NULL != reg_cache_find(rank, buf, 1));
 
     /* this is more restrictive than reg_cache_find() in that we locate
      * exactlty the same region starting address */
