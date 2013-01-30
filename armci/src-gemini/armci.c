@@ -1,3 +1,6 @@
+/* -*- c-basic-offset: 4; indent-tabs-mode: nil; -*- */
+/* vim: set sw=4 ts=8 expandtab : */
+
 #if HAVE_CONFIG_H
 #   include "config.h"
 #endif
@@ -44,6 +47,8 @@ static int use_locks_on_put = 0;
 local_state l_state;
 int armci_me=-1;
 int armci_nproc=-1;
+int armci_uses_shm = 0;
+
 MPI_Comm ARMCI_COMM_WORLD;
 
 /* static state */
@@ -212,11 +217,16 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
     int type = DMAPP_BYTE;
     int failure_observed = 0;
     reg_entry_t *dst_reg = NULL;
-    reg_entry_t *src_reg = NULL;
 
     /* Corner case */
     if (proc == l_state.rank) {
         memcpy(dst, src, bytes);
+        return status;
+    }
+
+    /* XPMEM optimisation */
+    if (armci_uses_shm && ARMCI_Same_node(proc)) {
+        armci_xpmem_memcpy(dst, src, bytes, proc);
         return status;
     }
 
@@ -238,8 +248,6 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
     /* Find the dmapp seg desc */
     dst_reg = reg_cache_find(proc, dst, bytes);
     assert(dst_reg);
-
-    src_reg = reg_cache_find(l_state.rank, src, bytes);
 
     status = dmapp_put_nbi(dst, &(dst_reg->mr), proc, src, nelems, type);
     increment_total_outstanding();
@@ -272,7 +280,6 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     int type = DMAPP_BYTE;
     int failure_observed = 0;
     reg_entry_t *dst_reg = NULL;
-    reg_entry_t *src_reg = NULL;
 
     /* Corner case */
     if (proc == l_state.rank) {
@@ -299,10 +306,8 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     dst_reg = reg_cache_find(proc, src, bytes);
     assert(dst_reg);
     
-    src_reg = reg_cache_find(l_state.rank, dst, bytes);
-
     status = dmapp_get_nbi(dst, src, &(dst_reg->mr),
-            proc, nelems, type);
+                           proc, nelems, type);
     increment_total_outstanding();
     if (status != DMAPP_RC_SUCCESS) {
         failure_observed = 1;
@@ -313,7 +318,7 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
         PARMCI_WaitAll();
         assert(bytes <= l_state.get_buf_len);
         status = dmapp_get_nbi(l_state.get_buf, src, &(dst_reg->mr),
-                proc, nelems, type);
+                               proc, nelems, type);
         increment_total_outstanding();
         PARMCI_WaitAll();
         memcpy(dst, l_state.get_buf, bytes);
@@ -1013,6 +1018,9 @@ int PARMCI_Init()
     /* Initialize */
     dmapp_initialize();
 
+    /* Determine SMP/Cluster node info */
+    armci_init_clusinfo();
+
     /* mutexes */
     l_state.mutexes = NULL;
     l_state.local_mutex = NULL;
@@ -1271,12 +1279,6 @@ int parmci_notify(int proc)
 }
 
 
-/* Always return 0, since shared memory not implemented yet */
-int PARMCI_Same_node(int proc)
-{
-    return 0;
-}
-
 static long local_fadd;
 
 int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
@@ -1464,16 +1466,16 @@ void ARMCI_Set_shm_limit(unsigned long shmemlimit)
 }
 
 
-/* Shared memory not implemented */
+/* Is Shared memory enabled? */
 int ARMCI_Uses_shm()
 {
-    return 0;
+    return armci_uses_shm;
 }
 
 
 int ARMCI_Uses_shm_group()
 {
-    return 0;
+    return (armci_smp_group != -1);
 }
 
 
@@ -1601,49 +1603,6 @@ int ARMCI_Free_group(void *ptr, ARMCI_Group *group)
     MPI_Barrier(comm);
 
     return 0;
-}
-
-
-/* Locality functions */
-
-
-int armci_domain_nprocs(armci_domain_t domain, int id)
-{
-    return 1;
-}
-
-
-int armci_domain_id(armci_domain_t domain, int glob_proc_id)
-{
-    return glob_proc_id;
-}
-
-
-int armci_domain_glob_proc_id(armci_domain_t domain, int id, int loc_proc_id)
-{
-    return id;
-}
-
-
-int armci_domain_my_id(armci_domain_t domain)
-{
-    assert(initialized);
-
-    return l_state.rank;
-}
-
-
-int armci_domain_count(armci_domain_t domain)
-{
-    assert(initialized);
-    return l_state.size;
-}
-
-
-int armci_domain_same_id(armci_domain_t domain, int proc)
-{
-    int rc = (proc == l_state.rank);
-    return rc;
 }
 
 
@@ -1941,7 +1900,7 @@ static void dmapp_terminate(void)
 
 int ARMCI_Same_node(int proc)
 {
-    return 0;
+    return armci_domain_same_id(ARMCI_DOMAIN_SMP, proc);
 }
 
 

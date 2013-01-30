@@ -317,6 +317,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__include_HEADERS_DIST) \
 @ARMCI_SRC_DIR_PORTALS_TRUE@am__append_42 = src-portals/tas_as.s
 @ARMCI_SRC_DIR_GEMINI_TRUE@am__append_43 = src-gemini/armci.c \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/armci_impl.h \
+@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/clusterinfo.c \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.c \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.h \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/message.c \

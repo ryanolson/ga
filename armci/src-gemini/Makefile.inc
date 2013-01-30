@@ -1,5 +1,6 @@
 libarmci_la_SOURCES += src-gemini/armci.c
 libarmci_la_SOURCES += src-gemini/armci_impl.h
+libarmci_la_SOURCES += src-gemini/clusterinfo.c
 libarmci_la_SOURCES += src-gemini/groups.c
 libarmci_la_SOURCES += src-gemini/groups.h
 libarmci_la_SOURCES += src-gemini/message.c
