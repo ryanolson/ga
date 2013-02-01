@@ -93,6 +93,13 @@ typedef struct {
     float imag;
 } SingleComplex;
 
+typedef struct{
+  int sent;
+  int received;
+  int waited;
+}armci_notify_t;
+
+armci_notify_t **_armci_notify_arr;
 
 static void* my_malloc(size_t size)
 {
@@ -188,7 +195,10 @@ static void increment_total_outstanding(void)
     ++total_outstanding;
 
     if (total_outstanding == max_outstanding_nb) {
-        dmapp_gsync_wait();
+	dmapp_return_t status;
+
+        status = dmapp_gsync_wait();
+        assert(status == DMAPP_RC_SUCCESS);
         total_outstanding = 0;
     }
 }
@@ -924,7 +934,7 @@ int PARMCI_Free_local(void *ptr)
 
 static void destroy_dmapp_locks(void)
 {
-#if DMAPP_LOCK
+#if HAVE_DMAPP_LOCK
 #else
     if (l_state.local_lock_buf)
             PARMCI_Free_local(l_state.local_lock_buf);
@@ -937,7 +947,7 @@ static void destroy_dmapp_locks(void)
 
 static void create_dmapp_locks(void)
 {
-#if DMAPP_LOCK
+#if HAVE_DMAPP_LOCK
     bzero(lock_desc, sizeof(lock_desc));
 #else
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
@@ -981,6 +991,48 @@ static void dmapp_free_buf(void)
     PARMCI_Free_local(l_state.acc_buf);
     PARMCI_Free_local(l_state.put_buf);
     PARMCI_Free_local(l_state.get_buf);
+}
+
+void armci_notify_init()
+{
+  int rc,bytes=sizeof(armci_notify_t)*armci_nproc;
+
+  _armci_notify_arr=
+        (armci_notify_t**)malloc(armci_nproc*sizeof(armci_notify_t*));
+  if(!_armci_notify_arr)armci_die("armci_notify_ini:malloc failed",armci_nproc);
+
+  if((rc=PARMCI_Malloc((void **)_armci_notify_arr, bytes))) 
+        armci_die(" armci_notify_init: armci_malloc failed",bytes); 
+  bzero(_armci_notify_arr[armci_me], bytes);
+}
+
+void cpu_yield()
+{
+#if defined(SYSV) || defined(MMAP) || defined(WIN32)
+#ifdef SOLARIS
+               yield();
+#elif defined(WIN32)
+               Sleep(1);
+#elif defined(_POSIX_PRIORITY_SCHEDULING)
+               sched_yield();
+#else
+               usleep(1);
+#endif
+#endif
+}
+
+/*\ busy wait 
+ *  n represents number of time delay units   
+ *  notused is useful to fool compiler by passing address of sensitive variable 
+\*/
+#define DUMMY_INIT 1.0001
+double _armci_dummy_work=DUMMY_INIT;
+void armci_util_spin(int n, void *notused)
+{
+int i;
+    for(i=0; i<n; i++)
+        if(armci_msg_me()>-1)  _armci_dummy_work *=DUMMY_INIT;
+    if(_armci_dummy_work>(double)armci_msg_nproc())_armci_dummy_work=DUMMY_INIT;
 }
 
 
@@ -1035,6 +1087,8 @@ int PARMCI_Init()
 
     // Create locks
     create_dmapp_locks();
+
+    armci_notify_init();
 
     /* mutexes */
     l_state.mutexes = NULL;
@@ -1293,20 +1347,52 @@ int PARMCI_NbAccV(int datatype, void *scale, armci_giov_t *iov,
 }
 
 
-/* Notify wait functions, not implemented yet */
 int parmci_notify(int proc)
 {
-    assert(0);
+   armci_notify_t *pnotify = _armci_notify_arr[armci_me]+proc;
+   pnotify->sent++;
+# ifdef MEM_FENCE
+   if(SAMECLUSNODE(proc)) MEM_FENCE;
+# endif
+   PARMCI_Put(&pnotify->sent,&(_armci_notify_arr[proc]+armci_me)->received, 
+             sizeof(pnotify->sent),proc);
+   return(pnotify->sent);
 }
 
 
+/*\ blocks until received count becomes >= waited count
+ *  return received count and store waited count in *pval
+\*/
+int parmci_notify_wait(int proc,int *pval)
+{
+  int retval;
+  {
+     long loop=0;
+     armci_notify_t *pnotify = _armci_notify_arr[armci_me]+proc;
+     pnotify->waited++;
+     while( pnotify->waited > pnotify->received) {
+         if(++loop == 1000) { loop=0;cpu_yield(); }
+         armci_util_spin(loop, pnotify);
+     }
+     *pval = pnotify->waited;
+     retval=pnotify->received;
+  }
+
+  return retval;
+}
+
+/* static variables are automatically mapped in by DMAPP
+ * so using them as the target of AMOs can avoid a local
+ * register/deregister sequence
+ */
 static long local_fadd;
+static long local_swap;
 
 int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
 {
     int status;
     if (op == ARMCI_FETCH_AND_ADD) {
-        /* dmapp doesn't have atomic fadd for int */
+        /* Gemini dmapp doesn't have atomic fadd for int */
         int tmp;
         dmapp_network_lock(proc);
         PARMCI_Get(prem, ploc, sizeof(int), proc);
@@ -1315,32 +1401,17 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
         dmapp_network_unlock(proc);
     }
     else if (op == ARMCI_FETCH_AND_ADD_LONG) {
-#if 1
         reg_entry_t *rem_reg = reg_cache_find(proc, prem, sizeof(long));
         assert(rem_reg);
-        status = dmapp_afadd_qw(&local_fadd, prem, &(l_state.job.data_seg), proc, extra);
-        if(status == DMAPP_RC_RESOURCE_ERROR) {
-           // the amo was never issued
-           dmapp_gsync_wait();
-           status = dmapp_afadd_qw(&local_fadd, prem, &(l_state.job.data_seg), proc, extra);
-        }
+        status = dmapp_afadd_qw(&local_fadd, prem, &(rem_reg->mr), proc, extra);
         if(status != DMAPP_RC_SUCCESS) {
            printf("dmapp_afadd_qw failed with %d\n",status);
            assert(status == DMAPP_RC_SUCCESS);
         }
-        long * lloc = (long *)ploc;
-        *lloc = local_fadd; 
-#else
-        long tmp;
-        dmapp_network_lock(proc);
-        PARMCI_Get(prem, ploc, sizeof(long), proc);
-        tmp = *(long*)ploc + extra;
-        PARMCI_Put(&tmp, prem, sizeof(long), proc);
-        dmapp_network_unlock(proc);
-#endif
+        *(long*)ploc = local_fadd;
     }
     else if (op == ARMCI_SWAP) {
-        /* dmapp doesn't have atomic swap for int */
+        /* Gemini dmapp doesn't have atomic swap for int */
         int tmp;
         dmapp_network_lock(proc);
         PARMCI_Get(prem, &tmp, sizeof(int), proc);
@@ -1349,18 +1420,17 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
         *(int*)ploc = tmp;
     }
     else if (op == ARMCI_SWAP_LONG) {
-        /* dmapp has atomic cswap for long, but it's non-blocking */
-        long tmp;
-        dmapp_network_lock(proc);
-        PARMCI_Get(prem, &tmp, sizeof(long), proc);
-        PARMCI_Put(ploc, prem, sizeof(long), proc);
-        dmapp_network_unlock(proc);
-        *(long*)ploc = tmp;
+        reg_entry_t *rem_reg = reg_cache_find(proc, prem, sizeof(long));
+        assert(rem_reg);
+        /* Gemini does not support SWAP, so emulate it with the AFAX operation */
+        status = dmapp_afax_qw(&local_swap, prem, &(rem_reg->mr), proc,
+                               0 /* AND mask */, *(long *)ploc /* XOR mask */);
+        *(long*)ploc = local_swap;
     }
     else  {
         assert(0);
     }
-    
+
     return 0;
 }
 
@@ -1960,12 +2030,6 @@ int ARMCI_Same_node(int proc)
 int PARMCI_Initialized()
 {
     return initialized;
-}
-
-
-int parmci_notify_wait(int proc, int *pval)
-{
-        assert(0);
 }
 
 

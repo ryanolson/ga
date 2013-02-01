@@ -437,7 +437,7 @@ void test_gop2_or_reduce(const int datatype, char *op, const int reduce_test)
           }
           for (j = 0; j < len[i]; j++)
             if (strncmp(op, "+", 1) == 0) {
-              int compare = 0;
+              long compare = 0;
               if (nproc % 2 == 0) {
                 if (j % 2 == 0) {
                   compare = -nproc / 2;
@@ -455,52 +455,52 @@ void test_gop2_or_reduce(const int datatype, char *op, const int reduce_test)
                 }
               }
               if (((long *) a[i])[j] != compare) {
-                printf("ERROR %s %s %s a[%d][%d] = %ld != %d\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
+                printf("ERROR %s %s %s a[%d][%d] = %ld != %ld\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
               }
             }
             else if (strncmp(op, "*", 1) == 0) {
-              int compare = 1;
+              long compare = 1;
               int k = 0;
               for (k = 0; k < nproc; k++) {
                 compare *= (k + j) * (((k + j) % 2 == 0) ? 1 : -1);
               }
               if (((long *) a[i])[j] != compare) {
-                printf("ERROR %s %s %s a[%d][%d] = %ld != %d\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
+                printf("ERROR %s %s %s a[%d][%d] = %ld != %ld\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
               }
             }
             else if (strncmp(op, "min", 3) == 0) {
-              int compare = -(j + nproc - 1);
+              long compare = -(j + nproc - 1);
               if (compare % 2 == 0 && nproc > 1) {
                 compare = -(j + nproc - 2);
               }
               if (((long *) a[i])[j] != compare) {
-                printf("ERROR %s %s %s a[%d][%d] = %ld != %d\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
+                printf("ERROR %s %s %s a[%d][%d] = %ld != %ld\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
               }
             }
             else if (strncmp(op, "max", 3) == 0) {
-              int compare = j + nproc - 1;
+              long compare = j + nproc - 1;
               if (compare % 2 != 0 && nproc > 1) {
                 compare = j + nproc - 2;
               }
               if (((long *) a[i])[j] != compare) {
-                printf("ERROR %s %s %s a[%d][%d] = %ld != %d\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
+                printf("ERROR %s %s %s a[%d][%d] = %ld != %ld\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
               }
             }
             else if (strncmp(op, "absmax", 6) == 0) {
-              int compare = j + nproc - 1;
+              long compare = j + nproc - 1;
               if (((long *) a[i])[j] != compare) {
-                printf("ERROR %s %s %s a[%d][%d] = %ld != %d\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
+                printf("ERROR %s %s %s a[%d][%d] = %ld != %ld\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
               }
             }
             else if (strncmp(op, "absmin", 6) == 0) {
-              int compare = j;
+              long compare = j;
               if (((long *) a[i])[j] != compare) {
-                printf("ERROR %s %s %s a[%d][%d] = %ld != %d\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
+                printf("ERROR %s %s %s a[%d][%d] = %ld != %ld\n", test_type, "ARMCI_LONG", op, i, j, ((long *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
               }
             }
@@ -561,14 +561,8 @@ void test_gop2_or_reduce(const int datatype, char *op, const int reduce_test)
               float compare = 1.0;
               int k = 0;
               for (k = 0; k < nproc; k++) {
-                compare *= ((float) k + j) / (float) nproc;
+                compare *= (((float) k + j) / (float) nproc) * (((k + j) % 2 == 0) ? 1.0 : -1.0);
               }
-              if ((nproc / 2) % 2 != 0)
-                if (nproc % 2 != 0)
-                  if (j % 2 == 0) {
-                    compare *= -1.0;
-                  }
-
               if (ARMCI_ABS(((float *) a[i])[j] - compare) > ARMCI_ABS(compare) * FLOAT_EPS) {
                 printf("ERROR %s %s %s a[%d][%d] = %f != %f\n", test_type, "ARMCI_FLOAT", op, i, j, ((float *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
@@ -579,7 +573,7 @@ void test_gop2_or_reduce(const int datatype, char *op, const int reduce_test)
               if ((j + nproc - 1) % 2 == 0 && nproc > 1) {
                 compare = -((float) j + nproc - 2) / nproc;
               }
-              if (((float *) a[i])[j] != compare) {
+              if (ARMCI_ABS(((float *) a[i])[j] - compare) > ARMCI_ABS(compare) * FLOAT_EPS) {
                 printf("ERROR %s %s %s a[%d][%d] = %f != %f\n", test_type, "ARMCI_FLOAT", op, i, j, ((float *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
               }
@@ -589,7 +583,7 @@ void test_gop2_or_reduce(const int datatype, char *op, const int reduce_test)
               if ((j + nproc - 1) % 2 != 0 && nproc > 1) {
                 compare = ((float) j + nproc - 2) / nproc;
               }
-              if (((float *) a[i])[j] != compare) {
+              if (ARMCI_ABS(((float *) a[i])[j] - compare) > ARMCI_ABS(compare) * FLOAT_EPS) {
                 printf("ERROR %s %s %s a[%d][%d] = %f != %f\n", test_type, "ARMCI_FLOAT", op, i, j, ((float *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
               }
@@ -663,13 +657,8 @@ void test_gop2_or_reduce(const int datatype, char *op, const int reduce_test)
               double compare = 1.0;
               int k = 0;
               for (k = 0; k < nproc; k++) {
-                compare *= ((float) k + j) / (float) nproc;
+                compare *= (((float) k + j) / (float) nproc) * (((k + j) % 2 == 0) ? 1.0 : -1.0);
               }
-              if ((nproc / 2) % 2 != 0)
-                if (nproc % 2 != 0)
-                  if (j % 2 == 0) {
-                    compare *= -1.0;
-                  }
               if (ARMCI_ABS(((double *) a[i])[j] - compare) > ARMCI_ABS(compare) * DOUBLE_EPS) {
                 printf("ERROR %s %s %s a[%d][%d] = %f != %f\n", test_type, "ARMCI_DOUBLE", op, i, j, ((double *) a[i])[j], compare);
                 ARMCI_Error("test_gop2_or_reduce failed\n", 0);
