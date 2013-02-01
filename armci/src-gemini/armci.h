@@ -219,6 +219,8 @@ int dassertp_fail(const char *cond_string, const char *file,
   dassertp((_enable),(_cond),("%d: error ival=%d\n",        \
 			      armci_msg_me(),(int)(_ival))) 
 
+extern int armci_msg_me(void);
+
 #define armci_die(_msg,_code) dassertc(1,0,             \
 ("%d:%s: %d\n", armci_msg_me(),(_msg),(_code)),_code)
 

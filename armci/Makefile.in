@@ -737,6 +737,7 @@ am__libarmci_la_SOURCES_DIST = gaf2c/gaf2c.c gaf2c/drand.c \
 	src-portals/gpc.c src-portals/threads.c src-portals/utils.c \
 	src-portals/tas.c src-gemini/armci.c src-gemini/armci_impl.h \
 	src-gemini/groups.c src-gemini/groups.h src-gemini/message.c \
+	src-gemini/clusterinfo.c \
 	src-gemini/reg_cache.c src-gemini/reg_cache.h \
 	src-openib/armci.c src-openib/armci_impl.h \
 	src-openib/armci_openib.h src-openib/contig.c \
@@ -928,6 +929,7 @@ am__dirstamp = $(am__leading_dot)dirstamp
 @ARMCI_SRC_DIR_PORTALS_TRUE@@INLINE_TAS_OKAY_TRUE@am__objects_13 = src-portals/tas.lo
 @ARMCI_SRC_DIR_GEMINI_TRUE@am__objects_14 = src-gemini/armci.lo \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.lo \
+@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/clusterinfo.lo \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/message.lo \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/reg_cache.lo
 @ARMCI_SRC_DIR_OPENIB_TRUE@am__objects_15 = src-openib/armci.lo \
@@ -1149,6 +1151,7 @@ am__libarmcii_la_SOURCES_DIST = gaf2c/gaf2c.c gaf2c/drand.c \
 	src-portals/gpc.c src-portals/threads.c src-portals/utils.c \
 	src-portals/tas.c src-gemini/armci.c src-gemini/armci_impl.h \
 	src-gemini/groups.c src-gemini/groups.h src-gemini/message.c \
+	src-gemini/clusterinfo.c \
 	src-gemini/reg_cache.c src-gemini/reg_cache.h \
 	src-openib/armci.c src-openib/armci_impl.h \
 	src-openib/armci_openib.h src-openib/contig.c \
@@ -3064,6 +3067,8 @@ src-gemini/$(DEPDIR)/$(am__dirstamp):
 	@: > src-gemini/$(DEPDIR)/$(am__dirstamp)
 src-gemini/armci.lo: src-gemini/$(am__dirstamp) \
 	src-gemini/$(DEPDIR)/$(am__dirstamp)
+src-gemini/clusterinfo.lo: src-gemini/$(am__dirstamp) \
+	src-gemini/$(DEPDIR)/$(am__dirstamp)
 src-gemini/groups.lo: src-gemini/$(am__dirstamp) \
 	src-gemini/$(DEPDIR)/$(am__dirstamp)
 src-gemini/message.lo: src-gemini/$(am__dirstamp) \
@@ -4038,6 +4043,8 @@ mostlyclean-compile:
 	-rm -f gaf2c/testargf.$(OBJEXT)
 	-rm -f src-gemini/armci.$(OBJEXT)
 	-rm -f src-gemini/armci.lo
+	-rm -f src-gemini/clusterinfo.$(OBJEXT)
+	-rm -f src-gemini/clusterinfo.lo
 	-rm -f src-gemini/groups.$(OBJEXT)
 	-rm -f src-gemini/groups.lo
 	-rm -f src-gemini/message.$(OBJEXT)

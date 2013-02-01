@@ -13,6 +13,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <hugetlbfs.h>
+#include <errno.h>
 
 /* 3rd party headers */
 #include <mpi.h>
@@ -78,7 +79,7 @@ static void* my_malloc(size_t size);
 static int   my_memalign(void **memptr, size_t alignment, size_t size);
 static int   PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc);
 static int   PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc);
-static void* _PARMCI_Malloc_local(armci_size_t size, dmapp_seg_desc_t *seg);
+static void* _PARMCI_Malloc_local(armci_size_t size, armci_mr_info_t *mr);
 
 /* needed for complex accumulate */
 typedef struct {
@@ -224,9 +225,15 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
         return status;
     }
 
+    /* Find the dest memory region mapping */
+    dst_reg = reg_cache_find(proc, dst, bytes);
+    assert(dst_reg);
+
     /* XPMEM optimisation */
     if (armci_uses_shm && ARMCI_Same_node(proc)) {
-        armci_xpmem_memcpy(dst, src, bytes, proc);
+        unsigned long offset = (unsigned long) dst - (unsigned long)dst_reg->mr.seg.addr;
+        void *xpmem_addr = dst_reg->mr.vaddr + offset;
+        memcpy(xpmem_addr, src, bytes);
         return status;
     }
 
@@ -245,11 +252,7 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
         type = DMAPP_DW;
     }
 
-    /* Find the dmapp seg desc */
-    dst_reg = reg_cache_find(proc, dst, bytes);
-    assert(dst_reg);
-
-    status = dmapp_put_nbi(dst, &(dst_reg->mr), proc, src, nelems, type);
+    status = dmapp_put_nbi(dst, &(dst_reg->mr.seg), proc, src, nelems, type);
     increment_total_outstanding();
     if (status != DMAPP_RC_SUCCESS) {
         failure_observed = 1;
@@ -260,8 +263,8 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
         PARMCI_WaitAll();
         assert(bytes <= l_state.put_buf_len);
         memcpy(l_state.put_buf, src, bytes);
-        status = dmapp_put_nbi(dst, &(dst_reg->mr),
-                proc, l_state.put_buf, nelems, type);
+        status = dmapp_put_nbi(dst, &(dst_reg->mr.seg),
+                               proc, l_state.put_buf, nelems, type);
         increment_total_outstanding();
         PARMCI_WaitAll();
 
@@ -279,11 +282,23 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     int nelems = bytes;
     int type = DMAPP_BYTE;
     int failure_observed = 0;
-    reg_entry_t *dst_reg = NULL;
+    reg_entry_t *src_reg = NULL;
 
     /* Corner case */
     if (proc == l_state.rank) {
         memcpy(dst, src, bytes);
+        return status;
+    }
+
+    /* Find the source memory region mapping */
+    src_reg = reg_cache_find(proc, src, bytes);
+    assert(src_reg);
+
+    /* XPMEM optimisation */
+    if (armci_uses_shm && ARMCI_Same_node(proc)) {
+        unsigned long offset = (unsigned long) src - (unsigned long)src_reg->mr.seg.addr;
+        void *xpmem_addr = src_reg->mr.vaddr + offset;
+        memcpy(dst, xpmem_addr, bytes);
         return status;
     }
 
@@ -302,22 +317,18 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
         type = DMAPP_DW;
     }
 
-    /* Find the dmapp seg desc */
-    dst_reg = reg_cache_find(proc, src, bytes);
-    assert(dst_reg);
-    
-    status = dmapp_get_nbi(dst, src, &(dst_reg->mr),
+    status = dmapp_get_nbi(dst, src, &(src_reg->mr.seg),
                            proc, nelems, type);
     increment_total_outstanding();
     if (status != DMAPP_RC_SUCCESS) {
         failure_observed = 1;
     }
-    
+
     /* Fallback */
-    if (failure_observed) {    
+    if (failure_observed) {
         PARMCI_WaitAll();
         assert(bytes <= l_state.get_buf_len);
-        status = dmapp_get_nbi(l_state.get_buf, src, &(dst_reg->mr),
+        status = dmapp_get_nbi(l_state.get_buf, src, &(src_reg->mr.seg),
                                proc, nelems, type);
         increment_total_outstanding();
         PARMCI_WaitAll();
@@ -346,7 +357,7 @@ static void dmapp_network_lock(int proc)
     do {    
         dmapp_status = dmapp_acswap_qw(l_state.local_lock_buf, 
                 l_state.atomic_lock_buf[proc],
-                &(dst_reg->mr),
+                &(dst_reg->mr.seg),
                 proc, 0, l_state.rank + 1);
 
         assert(dmapp_status == DMAPP_RC_SUCCESS);
@@ -369,10 +380,10 @@ static void dmapp_network_unlock(int proc)
     assert(dst_reg);
 
     do {
-        dmapp_status = dmapp_acswap_qw(l_state.local_lock_buf, 
-                l_state.atomic_lock_buf[proc],
-                &(dst_reg->mr),
-                proc, l_state.rank + 1, 0);
+        dmapp_status = dmapp_acswap_qw(l_state.local_lock_buf,
+                                       l_state.atomic_lock_buf[proc],
+                                       &(dst_reg->mr.seg),
+                                       proc, l_state.rank + 1, 0);
         assert(dmapp_status == DMAPP_RC_SUCCESS);
     } while (*(l_state.local_lock_buf) != l_state.rank + 1);
 #endif
@@ -855,7 +866,7 @@ int PARMCI_Free(void *ptr)
 }
 
 
-static void* _PARMCI_Malloc_local(armci_size_t size, dmapp_seg_desc_t *seg)
+static void* _PARMCI_Malloc_local(armci_size_t size, armci_mr_info_t *mr)
 {
     void *ptr;
     int rc;
@@ -865,19 +876,19 @@ static void* _PARMCI_Malloc_local(armci_size_t size, dmapp_seg_desc_t *seg)
     assert(0 == rc);
     assert(ptr);
 
-    status = dmapp_mem_register(ptr, size, seg);
+    status = dmapp_mem_register(ptr, size, &mr->seg);
     assert(status == DMAPP_RC_SUCCESS);
 #if DEBUG
     printf("[%d] _PARMCI_Malloc_local ptr=%p size=%zu\n",
             l_state.rank, ptr, size);
     printf("[%d] _PARMCI_Malloc_local seg=%p size=%zu\n",
-            l_state.rank, seg->addr, seg->len);
+            l_state.rank, mr->seg.addr, mr->seg.len);
 #endif
 #if 0
     assert(seg->addr == ptr);
     assert(seg->len == size); /* @TODO this failed! */
 #endif
-    reg_cache_insert(l_state.rank, ptr, size, *seg);
+    reg_cache_insert(l_state.rank, ptr, size, mr);
 
     return ptr;
 }
@@ -886,9 +897,9 @@ static void* _PARMCI_Malloc_local(armci_size_t size, dmapp_seg_desc_t *seg)
 void *PARMCI_Malloc_local(armci_size_t size)
 {
     void *ptr = NULL;
-    dmapp_seg_desc_t seg;
+    armci_mr_info_t mr = {0};
 
-    ptr = _PARMCI_Malloc_local(size, &seg);
+    ptr = _PARMCI_Malloc_local(size, &mr);
 
     return ptr;
 }
@@ -931,10 +942,10 @@ static void create_dmapp_locks(void)
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
     assert(l_state.local_lock_buf);
 
-    l_state.atomic_lock_buf = (void **)my_malloc(l_state.size * sizeof(void *));
+    l_state.atomic_lock_buf = (unsigned long **)my_malloc(l_state.size * sizeof(void *));
     assert(l_state.atomic_lock_buf);
 
-    PARMCI_Malloc((l_state.atomic_lock_buf), sizeof(long));
+    PARMCI_Malloc((void **)(l_state.atomic_lock_buf), sizeof(long));
 
     *(long *)(l_state.atomic_lock_buf[l_state.rank]) = 0;
     *(long *)(l_state.local_lock_buf) = 0;
@@ -1102,7 +1113,7 @@ int   PARMCI_NbGet(void *src, void *dst, int bytes, int proc, armci_hdl_t *hdl)
 {
     int rc;
     rc = PARMCI_Get(src, dst, bytes, proc);
-    return 0;
+    return rc;
 }
 
 
@@ -1111,6 +1122,8 @@ int   PARMCI_WaitProc(int proc)
     int status;
     status = dmapp_gsync_wait();
     assert(status == DMAPP_RC_SUCCESS);
+
+    return 0;
 }
 
 
@@ -1119,6 +1132,8 @@ int   PARMCI_Wait(armci_hdl_t* hdl)
     int status;
     status = dmapp_gsync_wait();
     assert(status == DMAPP_RC_SUCCESS);
+
+    return 0;
 }
 
 
@@ -1127,6 +1142,8 @@ int   PARMCI_Test(armci_hdl_t* hdl)
     int status;
     status = dmapp_gsync_wait();
     assert(status == DMAPP_RC_SUCCESS);
+
+    return 0;
 }
 
 
@@ -1370,7 +1387,7 @@ int PARMCI_Create_mutexes(int num)
     /* create all of the mutexes */
     l_state.mutexes = (unsigned long**)my_malloc(l_state.size * sizeof(unsigned long*));
     assert(l_state.mutexes);
-    PARMCI_Malloc(l_state.mutexes, num*sizeof(unsigned long));
+    PARMCI_Malloc((void **)l_state.mutexes, num*sizeof(unsigned long));
     /* init all of my mutexes to 0 */
     for (i=0; i<num; ++i) {
         l_state.mutexes[l_state.rank][i] = 0;
@@ -1426,11 +1443,11 @@ void PARMCI_Lock(int mutex, int proc)
     dst_reg = reg_cache_find(proc, &(l_state.mutexes[proc][mutex]), sizeof(unsigned long));
     assert(dst_reg);
 
-    do {    
-        dmapp_status = dmapp_acswap_qw(l_state.local_mutex, 
-                &(l_state.mutexes[proc][mutex]),
-                &(dst_reg->mr),
-                proc, 0, l_state.rank + 1);
+    do {
+        dmapp_status = dmapp_acswap_qw(l_state.local_mutex,
+                                       &(l_state.mutexes[proc][mutex]),
+                                       &(dst_reg->mr.seg),
+                                       proc, 0, l_state.rank + 1);
         assert(dmapp_status == DMAPP_RC_SUCCESS);
     }
     while(*(l_state.local_mutex) != 0);
@@ -1450,10 +1467,10 @@ void PARMCI_Unlock(int mutex, int proc)
     assert(dst_reg);
 
     do {
-        dmapp_status = dmapp_acswap_qw(l_state.local_mutex, 
-                &(l_state.mutexes[proc][mutex]),
-                &(dst_reg->mr),
-                proc, l_state.rank + 1, 0);
+        dmapp_status = dmapp_acswap_qw(l_state.local_mutex,
+                                       &(l_state.mutexes[proc][mutex]),
+                                       &(dst_reg->mr.seg),
+                                       proc, l_state.rank + 1, 0);
         assert(dmapp_status == DMAPP_RC_SUCCESS);
     }
     while (*(l_state.local_mutex) != l_state.rank + 1);
@@ -1473,17 +1490,9 @@ int ARMCI_Uses_shm()
 }
 
 
-int ARMCI_Uses_shm_group()
-{
-    return (armci_smp_group != -1);
-}
-
-
-/* Is it memory copy? */
 void PARMCI_Copy(void *src, void *dst, int n)
 {
-    assert(0);
-    memcpy(src, dst, sizeof(int) * n);
+    memcpy(dst, src, n);
 }
 
 
@@ -1503,8 +1512,8 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
     int rc = MPI_SUCCESS; 
     void *src_buf = NULL;
     armci_size_t max_size = size;
-    dmapp_seg_desc_t heap_seg;
-    dmapp_seg_desc_t *allgather_heap_seg = NULL;
+    armci_mr_info_t mr;
+    armci_mr_info_t *allgather_mr_info;
     int i = 0;
     reg_entry_t *reg = NULL;
 
@@ -1525,33 +1534,67 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
     assert(size > 0);
 
     /* allocate and register segment */
-    ptrs[comm_rank] = _PARMCI_Malloc_local(sizeof(char)*max_size, &heap_seg);
-  
+    ptrs[comm_rank] = _PARMCI_Malloc_local(sizeof(char)*max_size, &mr);
+
     /* exchange buffer address */
     /* @TODO: Consider using MPI_IN_PLACE? */
     memcpy(&src_buf, &ptrs[comm_rank], sizeof(void *));
     MPI_Allgather(&src_buf, sizeof(void *), MPI_BYTE, ptrs,
             sizeof(void *), MPI_BYTE, comm);
 
+    /* XPMEM support */
+    if (armci_uses_shm) {
+        /* 1. Make our memory segment available to other processes. */
+        mr.segid  = xpmem_make(mr.seg.addr,
+                               mr.seg.len,
+                               XPMEM_PERMIT_MODE, (void *)0600);
+        if (mr.segid == -1L) {
+            armci_die("xpmem_make failed", errno);
+        }
+    }
+
     /* allocate receive buffer for exchange of registration info */
-    allgather_heap_seg = (dmapp_seg_desc_t *)my_malloc(
-            sizeof(dmapp_seg_desc_t) * comm_size);
-    assert(allgather_heap_seg);
+    allgather_mr_info = (armci_mr_info_t *)my_malloc(sizeof(armci_mr_info_t) * comm_size);
+    assert(allgather_mr_info);
 
     /* exchange registration info */
-    MPI_Allgather(&heap_seg, sizeof(dmapp_seg_desc_t), MPI_BYTE,
-            allgather_heap_seg, sizeof(dmapp_seg_desc_t), MPI_BYTE, comm); 
+    MPI_Allgather(&mr, sizeof(armci_mr_info_t), MPI_BYTE,
+                  allgather_mr_info, sizeof(armci_mr_info_t), MPI_BYTE, comm);
 
-    /* insert this info into registration cache */
+    /* insert this mr info into the registration cache */
     for (i = 0; i < comm_size; ++i) {
         int world_rank = ARMCI_Absolute_id(group, i);
         if (i == comm_rank)
             continue;
-        reg_cache_insert(world_rank, ptrs[i], size, allgather_heap_seg[i]);
+
+        /* XPMEM optimisation */
+        if (armci_uses_shm && ARMCI_SAMECLUSNODE(world_rank)) {
+            xpmem_apid_t apid;
+            struct xpmem_addr xpmem_addr;
+            void *vaddr;
+
+            apid = xpmem_get(allgather_mr_info[i].segid, XPMEM_RDWR,
+                             XPMEM_PERMIT_MODE, (void *)0600);
+            if (apid == -1L) {
+                    armci_die("xpmem_get failed ", errno);
+            }
+
+            xpmem_addr.apid   = apid;
+            xpmem_addr.offset = 0;
+            vaddr = xpmem_attach(xpmem_addr, allgather_mr_info[i].seg.len, NULL);
+            if (vaddr == (void *)-1) {
+                armci_die("xpmem_attach failed ", errno);
+            }
+
+            allgather_mr_info[i].apid  = apid;
+            allgather_mr_info[i].vaddr = vaddr;
+        }
+
+        reg_cache_insert(world_rank, ptrs[i], size, &allgather_mr_info[i]);
     }
 
     // Free the temporary buffer
-    my_free(allgather_heap_seg);
+    my_free(allgather_mr_info);
 
     MPI_Barrier(comm);
 

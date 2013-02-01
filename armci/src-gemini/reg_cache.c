@@ -32,7 +32,7 @@
  * size used by dmapp. We only keep track of local dmapp memory registrations.
  */
 typedef struct _dmapp_entry_t {
-    dmapp_seg_desc_t mr;            /**< dmapp registered memory region */
+    dmapp_seg_desc_t seg;           /**< dmapp registered memory region */
     int count;                      /**< ref count */
     struct _dmapp_entry_t *next;    /**< next memory region in list */
 } dmapp_entry_t;
@@ -45,10 +45,10 @@ static dmapp_entry_t *dmapp_cache = NULL; /**< list of cached dmapp segments */
 
 
 /* the static functions in this module */
-static dmapp_entry_t *dmapp_cache_find(dmapp_seg_desc_t mr);
-static dmapp_entry_t *dmapp_cache_find_intersection(dmapp_seg_desc_t mr);
-static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t mr);
-static reg_return_t   dmapp_cache_delete(dmapp_seg_desc_t mr);
+static dmapp_entry_t *dmapp_cache_find(dmapp_seg_desc_t *seg);
+static dmapp_entry_t *dmapp_cache_find_intersection(dmapp_seg_desc_t *seg);
+static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t *seg);
+static reg_return_t   dmapp_cache_delete(dmapp_seg_desc_t *seg);
 static reg_return_t   seg_cmp(void *reg_addr, size_t reg_len,
                               void *oth_addr, size_t oth_len, int op);
 static reg_return_t   seg_intersects(void *reg_addr, size_t reg_len,
@@ -59,10 +59,10 @@ static reg_return_t   reg_entry_intersects(reg_entry_t *reg_entry,
                                            void *buf, size_t len);
 static reg_return_t   reg_entry_contains(reg_entry_t *reg_entry,
                                          void *buf, size_t len);
-static reg_return_t   dmapp_seg_intersects(dmapp_seg_desc_t first,
-                                           dmapp_seg_desc_t second);
-static reg_return_t   dmapp_seg_contains(dmapp_seg_desc_t first,
-                                         dmapp_seg_desc_t second);
+static reg_return_t   dmapp_seg_intersects(dmapp_seg_desc_t *first,
+                                           dmapp_seg_desc_t *second);
+static reg_return_t   dmapp_seg_contains(dmapp_seg_desc_t *first,
+                                         dmapp_seg_desc_t *second);
 
 
 #define TEST_FOR_INTERSECTION 0
@@ -240,9 +240,9 @@ reg_entry_contains(reg_entry_t *reg_entry, void *buf, size_t len)
  * @return RR_SUCCESS on success
  */
 static reg_return_t
-dmapp_seg_intersects(dmapp_seg_desc_t first, dmapp_seg_desc_t second)
+dmapp_seg_intersects(dmapp_seg_desc_t *first, dmapp_seg_desc_t *second)
 {
-    return seg_intersects(first.addr, first.len, second.addr, second.len);
+    return seg_intersects(first->addr, first->len, second->addr, second->len);
 }
 
 
@@ -255,9 +255,9 @@ dmapp_seg_intersects(dmapp_seg_desc_t first, dmapp_seg_desc_t second)
  * @return RR_SUCCESS on success
  */
 static reg_return_t
-dmapp_seg_contains(dmapp_seg_desc_t first, dmapp_seg_desc_t second)
+dmapp_seg_contains(dmapp_seg_desc_t *first, dmapp_seg_desc_t *second)
 {
-    return seg_contains(first.addr, first.len, second.addr, second.len);
+    return seg_contains(first->addr, first->len, second->addr, second->len);
 }
 
 
@@ -280,7 +280,7 @@ reg_entry_destroy(int rank, reg_entry_t *reg_entry)
     assert(0 <= rank && rank < reg_nprocs);
 
     if (l_state.rank == rank) {
-        dmapp_cache_delete(reg_entry->mr);
+        dmapp_cache_delete(&reg_entry->mr.seg);
     }
 
     /* free cache entry */
@@ -424,12 +424,12 @@ reg_cache_find(int rank, void *buf, size_t len)
 /**
  * Locate a dmapp segment which contains the given segment completely.
  *
- * @param[in] mr    the dmapp segment
+ * @param[in] seg    the dmapp segment
  * 
  * @return the reg cache entry, or NULL on failure
  */
 static dmapp_entry_t*
-dmapp_cache_find(dmapp_seg_desc_t mr)
+dmapp_cache_find(dmapp_seg_desc_t *seg)
 {
     dmapp_entry_t *entry = NULL;
     dmapp_entry_t *runner = NULL;
@@ -437,7 +437,7 @@ dmapp_cache_find(dmapp_seg_desc_t mr)
     runner = dmapp_cache;
 
     while (runner && NULL == entry) {
-        if (RR_SUCCESS == dmapp_seg_contains(runner->mr, mr)) {
+        if (RR_SUCCESS == dmapp_seg_contains(&runner->seg, seg)) {
             entry = runner;
         }
         runner = runner->next;
@@ -445,7 +445,7 @@ dmapp_cache_find(dmapp_seg_desc_t mr)
 
     /* we assert that the found entry was unique */
     while (runner) {
-        if (RR_SUCCESS == dmapp_seg_contains(runner->mr, mr)) {
+        if (RR_SUCCESS == dmapp_seg_contains(&runner->seg, seg)) {
             assert(0);
         }
         runner = runner->next;
@@ -501,12 +501,12 @@ reg_cache_find_intersection(int rank, void *buf, size_t len)
 /**
  * Locate a dmapp segment which intersects the given segment.
  *
- * @param[in] mr    the dmapp segment
+ * @param[in] seg    the dmapp segment
  * 
  * @return the reg cache entry, or NULL on failure
  */
 static dmapp_entry_t*
-dmapp_cache_find_intersection(dmapp_seg_desc_t mr)
+dmapp_cache_find_intersection(dmapp_seg_desc_t *seg)
 {
     dmapp_entry_t *entry = NULL;
     dmapp_entry_t *runner = NULL;
@@ -514,7 +514,7 @@ dmapp_cache_find_intersection(dmapp_seg_desc_t mr)
     runner = dmapp_cache;
 
     while (runner && NULL == entry) {
-        if (RR_SUCCESS == dmapp_seg_intersects(runner->mr, mr)) {
+        if (RR_SUCCESS == dmapp_seg_intersects(&runner->seg, seg)) {
             entry = runner;
         }
         runner = runner->next;
@@ -522,7 +522,7 @@ dmapp_cache_find_intersection(dmapp_seg_desc_t mr)
 
     /* we assert that the found entry was unique */
     while (runner) {
-        if (RR_SUCCESS == dmapp_seg_intersects(runner->mr, mr)) {
+        if (RR_SUCCESS == dmapp_seg_intersects(&runner->seg, seg)) {
             assert(0);
         }
         runner = runner->next;
@@ -545,10 +545,9 @@ dmapp_cache_find_intersection(dmapp_seg_desc_t mr)
  * @return RR_SUCCESS on success
  */
 reg_entry_t*
-reg_cache_insert(int rank, void *buf, size_t len, dmapp_seg_desc_t mr)
+reg_cache_insert(int rank, void *buf, size_t len, armci_mr_info_t *mr)
 {
     reg_entry_t *node = NULL;
-    dmapp_entry_t *dmapp_entry = NULL;
 
     /* preconditions */
     assert(NULL != reg_cache);
@@ -559,7 +558,7 @@ reg_cache_insert(int rank, void *buf, size_t len, dmapp_seg_desc_t mr)
     assert(NULL == reg_cache_find_intersection(rank, buf, len));
 
     if (rank == l_state.rank) {
-        dmapp_cache_insert(mr);
+        dmapp_cache_insert(&mr->seg);
     }
 
     /* allocate the new entry */
@@ -569,7 +568,7 @@ reg_cache_insert(int rank, void *buf, size_t len, dmapp_seg_desc_t mr)
     /* initialize the new entry */
     node->buf = buf;
     node->len = len;
-    node->mr = mr;
+    node->mr = *mr;
     node->next = NULL;
 
     /* push new entry to tail of linked list */
@@ -651,20 +650,20 @@ reg_cache_delete(int rank, void *buf)
  * Increments the ref count of an existing dmapp segement or inserts a new
  * entry into the list.
  *
- * @param[in] mr the dmapp segment
+ * @param[in] seg the dmapp segment
  *
  * @return
  */
-static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t mr)
+static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t *seg)
 {
     dmapp_entry_t *runner = NULL;
     dmapp_entry_t *previous_runner = NULL;
 
     /* this is more restrictive than dmapp_cache_find() in that we locate
-     * exactlty the same region starting address */
+     * exactly the same region starting address */
     runner = dmapp_cache;
     while (runner) {
-        if (runner->mr.addr == mr.addr) {
+        if (runner->seg.addr == seg->addr) {
             break;
         }
         previous_runner = runner;
@@ -673,17 +672,17 @@ static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t mr)
 
     if (runner) {
         /* make sure it's an exact match */
-        // assert(runner->mr.len == mr.len);
+        // assert(runner->seg.len == seg->len);
         /* increment ref count */
         ++(runner->count);
 #if DEBUG
         printf("[%d] incrementing ref count of (%p,%zu) to %d\n",
-                l_state.rank, runner->mr.addr, runner->mr.len, runner->count);
+                l_state.rank, runner->seg.addr, runner->seg.len, runner->count);
 #endif
     }
     else {
         runner = malloc(sizeof(dmapp_entry_t));
-        runner->mr = mr;
+        runner->seg = *seg;
         runner->count = 1;
         runner->next = NULL;
         if (previous_runner) {
@@ -694,7 +693,7 @@ static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t mr)
         }
 #if DEBUG
         printf("[%d] inserting (%p,%zu)\n",
-                l_state.rank, runner->mr.addr, runner->mr.len);
+                l_state.rank, runner->seg.addr, runner->seg.len);
 #endif
     }
 
@@ -706,15 +705,15 @@ static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t mr)
  * Decrements the ref count and possibly removes the dmapp cache entry
  * associated with the given dmapp segment.
  *
- * @param[in] mr the dmapp segment to possibly remove
+ * @param[in] seg the dmapp segment to possibly remove
  *
- * @pre NULL != dmapp_cache_find(mr)
+ * @pre NULL != dmapp_cache_find(seg)
  *
  * @return RR_SUCCESS on success
  *         RR_FAILURE otherwise
  */
 reg_return_t
-dmapp_cache_delete(dmapp_seg_desc_t mr)
+dmapp_cache_delete(dmapp_seg_desc_t *seg)
 {
     reg_return_t status = RR_FAILURE;
     dmapp_entry_t *runner = NULL;
@@ -722,9 +721,9 @@ dmapp_cache_delete(dmapp_seg_desc_t mr)
 
     /* preconditions */
     assert(NULL != dmapp_cache);
-    if (NULL == dmapp_cache_find(mr)) {
-        printf("[%d] dmapp_cache_find(mr) failed, mr=(%p,%zu)\n",
-                l_state.rank, mr.addr, mr.len);
+    if (NULL == dmapp_cache_find(seg)) {
+        printf("[%d] dmapp_cache_find(seg) failed, seg=(%p,%zu)\n",
+                l_state.rank, seg->addr, seg->len);
         assert(0);
     }
 
@@ -732,7 +731,7 @@ dmapp_cache_delete(dmapp_seg_desc_t mr)
      * exactlty the same region starting address */
     runner = dmapp_cache;
     while (runner) {
-        if (runner->mr.addr == mr.addr) {
+        if (runner->seg.addr == seg->addr) {
             break;
         }
         previous_runner = runner;
@@ -749,7 +748,7 @@ dmapp_cache_delete(dmapp_seg_desc_t mr)
     assert(runner->count >= 0);
 #if DEBUG
     printf("[%d] decrementing ref count of (%p,%zu) to %d\n",
-            l_state.rank, runner->mr.addr, runner->mr.len, runner->count);
+            l_state.rank, runner->seg.addr, runner->seg.len, runner->count);
 #endif
 
     if (0 == runner->count) {
@@ -762,9 +761,9 @@ dmapp_cache_delete(dmapp_seg_desc_t mr)
         }
 #if DEBUG
         printf("[%d] removing (%p,%zu)\n",
-                l_state.rank, runner->mr.addr, runner->mr.len);
+                l_state.rank, runner->seg.addr, runner->seg.len);
 #endif
-        dmapp_mem_unregister(&(runner->mr));
+        dmapp_mem_unregister(&(runner->seg));
 
         free(runner);
     }

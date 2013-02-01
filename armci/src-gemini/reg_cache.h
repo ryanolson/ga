@@ -17,7 +17,7 @@ typedef enum _reg_return_t {
 typedef struct _reg_entry_t {
     void *buf;                  /**< starting address of region */
     size_t len;                 /**< length of region */
-    dmapp_seg_desc_t mr;        /**< dmapp registered memory region */
+    armci_mr_info_t mr;       /**< registered memory region */
     struct _reg_entry_t *next;  /**< next memory region in list */
 } reg_entry_t;
 
@@ -29,7 +29,7 @@ typedef struct _reg_entry_t {
 reg_return_t reg_cache_init(int nprocs);
 reg_return_t reg_cache_destroy();
 reg_entry_t *reg_cache_find(int rank, void *buf, size_t len);
-reg_entry_t *reg_cache_insert(int rank, void *buf, size_t len, dmapp_seg_desc_t mr);
+reg_entry_t *reg_cache_insert(int rank, void *buf, size_t len, armci_mr_info_t *mr);
 reg_return_t reg_cache_delete(int, void *buf);
 
 #endif /* _REG_CACHE_H_ */

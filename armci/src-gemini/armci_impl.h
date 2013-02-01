@@ -3,6 +3,7 @@
 
 #include <dmapp.h>
 #include <mpi.h>
+#include <xpmem.h>
 
 #define ARMCI_DMAPP_OFFLOAD_THRESHOLD 2048
 #define MAX_NB_OUTSTANDING 1024
@@ -23,6 +24,14 @@ extern int armci_clus_me;           /* my node index */
 extern int armci_nclus;             /* number of nodes that make up job */
 
 extern ARMCI_Group armci_smp_group; /* ARMCI group for local SMP ranks */
+
+/* Convert rank to node index. Supports Block(1) and Cyclic(0) layouts only */
+#define ARMCI_RANK2NODE(P) ((armci_rank_order == 1) ? (P)/armci_npes_per_node : (P)%armci_nclus)
+
+/* Convert rank to local SMP index. Supports Block(1) and Cyclic(0) layouts only */
+#define ARMCI_RANK2LINDEX(P) ((armci_rank_order == 1) ? (P)%armci_npes_per_node : (P)/armci_nclus)
+
+#define ARMCI_SAMECLUSNODE(P) (ARMCI_RANK2NODE(P) == armci_clus_me)
 
 typedef struct {
 
@@ -53,5 +62,13 @@ typedef struct {
 } local_state;
 
 extern local_state l_state;
+
+typedef struct armci_mr_info {
+    dmapp_seg_desc_t seg;     /* DMAPP memory registration seg */
+    xpmem_segid_t    segid;   /* xpmem handle for data segment of remote PE */
+    xpmem_apid_t     apid;    /* access permit ID for that data segment */
+    long             length;  /* length of the data segment */
+    void            *vaddr;   /* vaddr at which the XPMEM mapping was created */
+} armci_mr_info_t;
 
 #endif /* ARMCI_IMPL_H_ */
