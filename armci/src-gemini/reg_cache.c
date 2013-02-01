@@ -1,3 +1,6 @@
+/* -*- c-basic-offset: 4; indent-tabs-mode: nil; -*- */
+/* vim: set sw=4 ts=8 expandtab : */
+
 /**
  * Registration cache.
  *
@@ -278,6 +281,14 @@ reg_entry_destroy(int rank, reg_entry_t *reg_entry)
     /* preconditions */
     assert(NULL != reg_entry);
     assert(0 <= rank && rank < reg_nprocs);
+
+    /* XPMEM support */
+    if (armci_uses_shm && ARMCI_SAMECLUSNODE(rank)) {
+        xpmem_detach(reg_entry->mr.vaddr);
+        xpmem_release(reg_entry->mr.apid);
+        if (l_state.rank == rank)
+            xpmem_remove(reg_entry->mr.segid);
+    }
 
     if (l_state.rank == rank) {
         dmapp_cache_delete(&reg_entry->mr.seg);
@@ -728,7 +739,7 @@ dmapp_cache_delete(dmapp_seg_desc_t *seg)
     }
 
     /* this is more restrictive than dmapp_cache_find() in that we locate
-     * exactlty the same region starting address */
+     * exactly the same region starting address */
     runner = dmapp_cache;
     while (runner) {
         if (runner->seg.addr == seg->addr) {
