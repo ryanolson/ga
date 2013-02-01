@@ -48,7 +48,8 @@ static int use_locks_on_put = 0;
 local_state l_state;
 int armci_me=-1;
 int armci_nproc=-1;
-int armci_uses_shm = 0;
+/* XPMEM support */
+int armci_uses_shm = 1;
 
 MPI_Comm ARMCI_COMM_WORLD;
 
@@ -1029,8 +1030,11 @@ int PARMCI_Init()
     /* Initialize */
     dmapp_initialize();
 
-    /* Determine SMP/Cluster node info */
+    /* XPMEM support: Determine SMP/Cluster node info */
     armci_init_clusinfo();
+
+    // Create locks
+    create_dmapp_locks();
 
     /* mutexes */
     l_state.mutexes = NULL;
@@ -1791,6 +1795,16 @@ static void check_envs(void)
         armci_page_size = sc_page_size;
     }
 
+    /* XPMEM support */
+    if ((value = getenv("ARMCI_USE_XPMEM")) != NULL) {
+        if (0 == strncasecmp(value, "y", 1)) {
+            armci_uses_shm = 1;
+        }
+        else if (0 == strncasecmp(value, "n", 1)) {
+            armci_uses_shm = 0;
+        }
+    }
+
 //#if DEBUG
 #if 1
     if (0 == l_state.rank) {
@@ -1800,6 +1814,7 @@ static void check_envs(void)
         printf("armci_page_size=%ld\n", armci_page_size);
         printf("armci_is_using_huge_pages=%d\n", armci_is_using_huge_pages);
         printf("malloc_is_using_huge_pages=%d\n", malloc_is_using_huge_pages);
+        printf("XPMEM use is %s\n", (armci_uses_shm) ? "ENABLED" : "DISABLED");
     }
 #endif
 }
@@ -1916,11 +1931,6 @@ static void dmapp_initialize(void)
     // Allocate buffers
     dmapp_alloc_buf();
 
-    // Create locks
-    create_dmapp_locks();
-
-    /* Synchronize */
-    MPI_Barrier(l_state.world_comm);
 }
 
 

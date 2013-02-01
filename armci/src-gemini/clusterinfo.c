@@ -213,8 +213,11 @@ void armci_init_clusinfo(void)
     }
 
     /* SHM optimisations are only supported for block(1) and cyclic(0) rank allocations */
-    if (armci_rank_order >= 2)
+    if (armci_rank_order >= 2) {
+        /* Disable XPMEM use */
+        armci_uses_shm = 0;
         return;
+    }
 
     /* Get job parameters such as rank, size etc. */
     rc = armci_get_jobparams(&pe, &npes, &npes_on_smp, &pe_list);
@@ -235,10 +238,8 @@ void armci_init_clusinfo(void)
     armci_clus_me     = ARMCI_RANK2NODE(armci_me);
     armci_smp_index   = ARMCI_RANK2LINDEX(armci_me);
 
+    /* Currently not used */
     ARMCI_Group_create(armci_npes_on_smp, armci_pes_on_smp, &armci_smp_group);
-
-    /* Flag that on node SMP optimisations are enabled */
-    armci_uses_shm = 1;
 
     return;
 }

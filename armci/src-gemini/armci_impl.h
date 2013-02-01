@@ -8,6 +8,8 @@
 #define ARMCI_DMAPP_OFFLOAD_THRESHOLD 2048
 #define MAX_NB_OUTSTANDING 1024
 
+extern void armci_init_clusinfo(void);
+
 extern int armci_nproc, armci_me;
 extern int armci_uses_shm;          /* is SHM (i.e. XPMEM) in use? */
 
