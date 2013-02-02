@@ -40,44 +40,88 @@ int           armci_nclus = -1;            /* number of nodes that make up job *
 
 ARMCI_Group   armci_smp_group = -1;        /* ARMCI group for local SMP ranks */
 
+/* Optimised memcpy implementation */
+void *(*_cray_armci_memcpy)(void *dest, const void *src, size_t n) = NULL;
+int armci_use_system_memcpy = 0;
+
 void
-armci_allgather_ordered(void *in, void *out, int len)
+armci_init_memcpy(void)
 {
-        int i, rc;
-        char *tmp_buf, *out_ptr;
-        int job_size = 0;
-        static int *armci_ivec_ptr = NULL;
+    unsigned int family, model, stepping;
+    unsigned int genuine_intel = 0;
+    unsigned int authentic_amd = 0;
+    unsigned int ncpus = 0;
+    FILE *cpuinfo;
+    char buf[80];
+    char vendor_id[12]; /* vendor id is always 12 characters */
 
-        rc = PMI_Get_size(&job_size);
-        assert(rc == PMI_SUCCESS);
+    if (armci_use_system_memcpy) {
+        _cray_armci_memcpy = NULL;
+        return;
+    }
 
-        /* This array needs to be generated during init */
-        if (armci_ivec_ptr == NULL) {
-            int my_rank = -1;
+    family = model = stepping = 0;
 
-            rc = PMI_Get_rank(&my_rank);
-            assert(rc == PMI_SUCCESS);
+    cpuinfo = fopen("/proc/cpuinfo","r");
 
-            armci_ivec_ptr = (int *)malloc(sizeof(int) * job_size);
-            assert(armci_ivec_ptr != NULL);
+    if (cpuinfo) {
+        while (fgets(buf, sizeof(buf), cpuinfo) != NULL) {
+            if (!strncmp(buf, "vendor_id", 9)) {
+                ncpus++;
+                if (ncpus > 1) {
+                    /* No need to process info for more than 1 CPU */
+		    fclose(cpuinfo);
+                    break;
+                }
 
-            rc = PMI_Allgather(&my_rank, armci_ivec_ptr, sizeof(int));
-            assert(rc == PMI_SUCCESS);
+                sscanf(buf, "vendor_id\t: %s", vendor_id);
+
+                if (!strncmp(vendor_id, "GenuineIntel", 12)) {
+                    genuine_intel = 1;
+                } else if (!strncmp(vendor_id, "AuthenticAMD", 12)) {
+                    authentic_amd = 1;
+                } else {
+                    /* Unknown vendor. */
+                    fclose(cpuinfo);
+                    break;
+                }
+                continue;
+            }
+
+            if (!strncmp(buf, "cpu family", 10)) {
+                sscanf(buf, "cpu family\t: %u", &family);
+                continue;
+            }
+
+            if (!strncmp(buf, "model\t\t", 7)) {
+                sscanf(buf, "model\t\t: %u", &model);
+                continue;
+            }
+
+            if (!strncmp(buf, "stepping", 8)) {
+                sscanf(buf, "stepping\t: %u", &stepping);
+                continue;
+            }
         }
+    } else {
+        /* Couldn't open /proc/cpuinfo.  This shouldn't happen. */
+        armci_use_system_memcpy = 1;
+        _cray_armci_memcpy = NULL;
+    }
 
-        tmp_buf = (char *)malloc(job_size * len);
-        assert(tmp_buf);
-
-        rc = PMI_Allgather(in,tmp_buf,len);
-        assert(rc == PMI_SUCCESS);
-
-        out_ptr = out;
-
-        for(i=0;i<job_size;i++) {
-            memcpy(&out_ptr[len * armci_ivec_ptr[i]], &tmp_buf[i * len], len);
-        }
-
-        free(tmp_buf);
+    if (genuine_intel) {
+        _cray_armci_memcpy = _cray_mpi_memcpy_snb;
+        armci_use_system_memcpy = 0;
+    } else if (authentic_amd) {
+        /* Use system default for now.  Optimized version for Interlagos
+         * produces wrong answers / failed tests. */
+        armci_use_system_memcpy = 1;
+        _cray_armci_memcpy = NULL;
+    } else {
+        /* Unknown vendor id? */
+        armci_use_system_memcpy = 1;
+        _cray_armci_memcpy = NULL;
+    }
 }
 
 /* armci_get_jobparams gets job parameters such as rank, size from PMI.
@@ -240,6 +284,8 @@ void armci_init_clusinfo(void)
 
     /* Currently not used */
     ARMCI_Group_create(armci_npes_on_smp, armci_pes_on_smp, &armci_smp_group);
+
+    armci_init_memcpy();
 
     return;
 }

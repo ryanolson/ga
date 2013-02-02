@@ -27,6 +27,11 @@ extern int armci_nclus;             /* number of nodes that make up job */
 
 extern ARMCI_Group armci_smp_group; /* ARMCI group for local SMP ranks */
 
+/* Optimised memcpy implementation */
+extern void *(*_cray_armci_memcpy)(void *dest, const void *src, size_t n);
+extern void *_cray_mpi_memcpy_snb(void *dest, const void *src, size_t n);
+extern int armci_use_system_memcpy;
+
 /* Convert rank to node index. Supports Block(1) and Cyclic(0) layouts only */
 #define ARMCI_RANK2NODE(P) ((armci_rank_order == 1) ? (P)/armci_npes_per_node : (P)%armci_nclus)
 

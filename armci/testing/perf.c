@@ -13,9 +13,9 @@ static int size[] = {2,4,8,16,32,64,128,256,512,1024,0}; /* 0 is sentinal */
 #define GET 1
 #define ACC 2
 
-#define MAX_MESSAGE_SIZE 1024*1024
+#define MAX_MESSAGE_SIZE 16*1024*1024
 #define MEDIUM_MESSAGE_SIZE 8192
-#define ITER_SMALL 100
+#define ITER_SMALL 1000
 #define ITER_LARGE 100
 
 #define WARMUP 10
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     assert(nproc == 2);
 
     if (0 == me) {
-        printf("msg size (bytes)     avg time (us)    avg b/w (MB/sec)\n");
+        printf("msg size (bytes)      avg time (us)      avg b/w (MB/sec)\n");
     }
 
     if (0 == me) {
@@ -141,7 +141,7 @@ static void contig_test(size_t buffer_size, int op)
 
 
         if (0 == me) {
-            printf("%8zu\t\t%6.2f\t\t%10.2f\n",
+            printf("%8zu\t\t%8.2f\t\t%10.2f\n",
                     msg_size,
                     ((t_end  - t_start))/iter,
                     msg_size*iter/((t_end - t_start)));

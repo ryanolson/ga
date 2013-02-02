@@ -204,6 +204,17 @@ static void increment_total_outstanding(void)
 }
 
 
+void PARMCI_Copy(void *src, void *dst, int n)
+{
+    unsigned long x = ((unsigned long) src | (unsigned long) dst) | n;
+
+    if (armci_use_system_memcpy || (x & sizeof(long)-1))
+        memcpy(dst, src, n);
+    else {
+        _cray_armci_memcpy(dst, src, n);
+    }
+}
+
 /* The blocking implementations should use blocking DMAPP calls */
 int PARMCI_Put(void *src, void *dst, int bytes, int proc)
 {
@@ -232,7 +243,7 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
 
     /* Corner case */
     if (proc == l_state.rank) {
-        memcpy(dst, src, bytes);
+        PARMCI_Copy(src, dst, bytes);
         return status;
     }
 
@@ -244,7 +255,7 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
     if (armci_uses_shm && ARMCI_Same_node(proc)) {
         unsigned long offset = (unsigned long) dst - (unsigned long)dst_reg->mr.seg.addr;
         void *xpmem_addr = dst_reg->mr.vaddr + offset;
-        memcpy(xpmem_addr, src, bytes);
+        PARMCI_Copy(src, xpmem_addr, bytes);
         return status;
     }
 
@@ -273,7 +284,7 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
     if (failure_observed) {
         PARMCI_WaitAll();
         assert(bytes <= l_state.put_buf_len);
-        memcpy(l_state.put_buf, src, bytes);
+        PARMCI_Copy(src, l_state.put_buf, bytes);
         status = dmapp_put_nbi(dst, &(dst_reg->mr.seg),
                                proc, l_state.put_buf, nelems, type);
         increment_total_outstanding();
@@ -297,7 +308,7 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
 
     /* Corner case */
     if (proc == l_state.rank) {
-        memcpy(dst, src, bytes);
+        PARMCI_Copy(src, dst, bytes);
         return status;
     }
 
@@ -309,7 +320,7 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     if (armci_uses_shm && ARMCI_Same_node(proc)) {
         unsigned long offset = (unsigned long) src - (unsigned long)src_reg->mr.seg.addr;
         void *xpmem_addr = src_reg->mr.vaddr + offset;
-        memcpy(dst, xpmem_addr, bytes);
+        PARMCI_Copy(xpmem_addr, dst, bytes);
         return status;
     }
 
@@ -343,7 +354,7 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
                                proc, nelems, type);
         increment_total_outstanding();
         PARMCI_WaitAll();
-        memcpy(dst, l_state.get_buf, bytes);
+        PARMCI_Copy(l_state.get_buf, dst, bytes);
 
         /* Fallback must work correctly */
         assert(status == DMAPP_RC_SUCCESS);
@@ -1403,7 +1414,7 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
     else if (op == ARMCI_FETCH_AND_ADD_LONG) {
         reg_entry_t *rem_reg = reg_cache_find(proc, prem, sizeof(long));
         assert(rem_reg);
-        status = dmapp_afadd_qw(&local_fadd, prem, &(rem_reg->mr), proc, extra);
+        status = dmapp_afadd_qw(&local_fadd, prem, &(rem_reg->mr.seg), proc, extra);
         if(status != DMAPP_RC_SUCCESS) {
            printf("dmapp_afadd_qw failed with %d\n",status);
            assert(status == DMAPP_RC_SUCCESS);
@@ -1423,7 +1434,7 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
         reg_entry_t *rem_reg = reg_cache_find(proc, prem, sizeof(long));
         assert(rem_reg);
         /* Gemini does not support SWAP, so emulate it with the AFAX operation */
-        status = dmapp_afax_qw(&local_swap, prem, &(rem_reg->mr), proc,
+        status = dmapp_afax_qw(&local_swap, prem, &(rem_reg->mr.seg), proc,
                                0 /* AND mask */, *(long *)ploc /* XOR mask */);
         *(long*)ploc = local_swap;
     }
@@ -1561,12 +1572,6 @@ void ARMCI_Set_shm_limit(unsigned long shmemlimit)
 int ARMCI_Uses_shm()
 {
     return armci_uses_shm;
-}
-
-
-void PARMCI_Copy(void *src, void *dst, int n)
-{
-    memcpy(dst, src, n);
 }
 
 
@@ -1875,6 +1880,15 @@ static void check_envs(void)
         }
     }
 
+    if ((value = getenv("ARMCI_USE_SYSTEM_MEMCPY")) != NULL) {
+        if (0 == strncasecmp(value, "y", 1)) {
+            armci_use_system_memcpy = 1;
+        }
+        else if (0 == strncasecmp(value, "n", 1)) {
+            armci_use_system_memcpy = 0;
+        }
+    }
+
 //#if DEBUG
 #if 1
     if (0 == l_state.rank) {
@@ -1885,6 +1899,7 @@ static void check_envs(void)
         printf("armci_is_using_huge_pages=%d\n", armci_is_using_huge_pages);
         printf("malloc_is_using_huge_pages=%d\n", malloc_is_using_huge_pages);
         printf("XPMEM use is %s\n", (armci_uses_shm) ? "ENABLED" : "DISABLED");
+        printf("USE_SYSTEM_MEMCPY is %s\n", (armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
     }
 #endif
 }
