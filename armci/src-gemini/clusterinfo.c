@@ -113,10 +113,15 @@ armci_init_memcpy(void)
         _cray_armci_memcpy = _cray_mpi_memcpy_snb;
         armci_use_system_memcpy = 0;
     } else if (authentic_amd) {
+#if 1
         /* Use system default for now.  Optimized version for Interlagos
-         * produces wrong answers / failed tests. */
+         * (v10) produces wrong answers / failed tests. */
         armci_use_system_memcpy = 1;
         _cray_armci_memcpy = NULL;
+#else
+        _cray_armci_memcpy = _cray_mpi_memcpy_int;
+        armci_use_system_memcpy = 0;
+#endif
     } else {
         /* Unknown vendor id? */
         armci_use_system_memcpy = 1;

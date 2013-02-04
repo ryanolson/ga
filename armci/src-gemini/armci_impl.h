@@ -30,6 +30,7 @@ extern ARMCI_Group armci_smp_group; /* ARMCI group for local SMP ranks */
 /* Optimised memcpy implementation */
 extern void *(*_cray_armci_memcpy)(void *dest, const void *src, size_t n);
 extern void *_cray_mpi_memcpy_snb(void *dest, const void *src, size_t n);
+extern void *_cray_mpi_memcpy_int(void *dest, const void *src, size_t n);
 extern int armci_use_system_memcpy;
 
 /* Convert rank to node index. Supports Block(1) and Cyclic(0) layouts only */

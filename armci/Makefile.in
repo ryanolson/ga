@@ -319,6 +319,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__include_HEADERS_DIST) \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/armci_impl.h \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/clusterinfo.c \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/cray_memcpy_intel.s \
+@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/cray_memcpy_amd.s \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.c \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.h \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/message.c \
@@ -740,6 +741,7 @@ am__libarmci_la_SOURCES_DIST = gaf2c/gaf2c.c gaf2c/drand.c \
 	src-gemini/groups.c src-gemini/groups.h src-gemini/message.c \
 	src-gemini/clusterinfo.c \
 	src-gemini/cray_memcpy_intel.s \
+	src-gemini/cray_memcpy_amd.s \
 	src-gemini/reg_cache.c src-gemini/reg_cache.h \
 	src-openib/armci.c src-openib/armci_impl.h \
 	src-openib/armci_openib.h src-openib/contig.c \
@@ -933,6 +935,7 @@ am__dirstamp = $(am__leading_dot)dirstamp
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.lo \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/clusterinfo.lo \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/cray_memcpy_intel.lo \
+@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/cray_memcpy_amd.lo \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/message.lo \
 @ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/reg_cache.lo
 @ARMCI_SRC_DIR_OPENIB_TRUE@am__objects_15 = src-openib/armci.lo \
@@ -1156,6 +1159,7 @@ am__libarmcii_la_SOURCES_DIST = gaf2c/gaf2c.c gaf2c/drand.c \
 	src-gemini/groups.c src-gemini/groups.h src-gemini/message.c \
 	src-gemini/clusterinfo.c \
 	src-gemini/cray_memcpy_intel.s \
+	src-gemini/cray_memcpy_amd.s \
 	src-gemini/reg_cache.c src-gemini/reg_cache.h \
 	src-openib/armci.c src-openib/armci_impl.h \
 	src-openib/armci_openib.h src-openib/contig.c \
@@ -3075,6 +3079,8 @@ src-gemini/clusterinfo.lo: src-gemini/$(am__dirstamp) \
 	src-gemini/$(DEPDIR)/$(am__dirstamp)
 src-gemini/cray_memcpy_intel.lo: src-gemini/$(am__dirstamp) \
 	src-gemini/$(DEPDIR)/$(am__dirstamp)
+src-gemini/cray_memcpy_amd.lo: src-gemini/$(am__dirstamp) \
+	src-gemini/$(DEPDIR)/$(am__dirstamp)
 src-gemini/groups.lo: src-gemini/$(am__dirstamp) \
 	src-gemini/$(DEPDIR)/$(am__dirstamp)
 src-gemini/message.lo: src-gemini/$(am__dirstamp) \
@@ -4053,6 +4059,8 @@ mostlyclean-compile:
 	-rm -f src-gemini/clusterinfo.lo
 	-rm -f src-gemini/cray_memcpy_intel.$(OBJEXT)
 	-rm -f src-gemini/cray_memcpy_intel.lo
+	-rm -f src-gemini/cray_memcpy_amd.$(OBJEXT)
+	-rm -f src-gemini/cray_memcpy_amd.lo
 	-rm -f src-gemini/groups.$(OBJEXT)
 	-rm -f src-gemini/groups.lo
 	-rm -f src-gemini/message.$(OBJEXT)

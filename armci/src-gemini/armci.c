@@ -1106,6 +1106,20 @@ int PARMCI_Init()
     l_state.local_mutex = NULL;
     l_state.num_mutexes = NULL;
 
+//#if DEBUG
+#if 1
+    if (0 == l_state.rank) {
+        printf("gethugepagesize()=%ld\n", hugepagesize);
+        printf("hugetlb_default_page_size=%ld\n", hugetlb_default_page_size);
+        printf("_SC_PAGESIZE=%ld\n", sc_page_size);
+        printf("armci_page_size=%ld\n", armci_page_size);
+        printf("armci_is_using_huge_pages=%d\n", armci_is_using_huge_pages);
+        printf("malloc_is_using_huge_pages=%d\n", malloc_is_using_huge_pages);
+        printf("XPMEM use is %s\n", (armci_uses_shm) ? "ENABLED" : "DISABLED");
+        printf("Optimized CPU memcpy is %s\n", (!armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
+    }
+#endif
+
     /* Synch - Sanity Check */
     MPI_Barrier(l_state.world_comm);
 
@@ -1564,13 +1578,15 @@ void PARMCI_Unlock(int mutex, int proc)
 
 void ARMCI_Set_shm_limit(unsigned long shmemlimit)
 {
-    assert(0);
+    /* Not relevant for XPMEM support */
+//    assert(0);
 }
 
 
 /* Is Shared memory enabled? */
 int ARMCI_Uses_shm()
 {
+    /* Returns 1 when XPMEM support is enabled */
     return armci_uses_shm;
 }
 
@@ -1578,6 +1594,7 @@ int ARMCI_Uses_shm()
 /* Group Functions */
 int ARMCI_Uses_shm_grp(ARMCI_Group *group)
 {
+    /* Not sure what we do with this and XPMEM support */
     assert(0);
 }
 
@@ -1889,19 +1906,6 @@ static void check_envs(void)
         }
     }
 
-//#if DEBUG
-#if 1
-    if (0 == l_state.rank) {
-        printf("gethugepagesize()=%ld\n", hugepagesize);
-        printf("hugetlb_default_page_size=%ld\n", hugetlb_default_page_size);
-        printf("_SC_PAGESIZE=%ld\n", sc_page_size);
-        printf("armci_page_size=%ld\n", armci_page_size);
-        printf("armci_is_using_huge_pages=%d\n", armci_is_using_huge_pages);
-        printf("malloc_is_using_huge_pages=%d\n", malloc_is_using_huge_pages);
-        printf("XPMEM use is %s\n", (armci_uses_shm) ? "ENABLED" : "DISABLED");
-        printf("USE_SYSTEM_MEMCPY is %s\n", (armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
-    }
-#endif
 }
 
 
