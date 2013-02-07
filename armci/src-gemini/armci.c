@@ -22,9 +22,6 @@
 #include "parmci.h"
 #include "reg_cache.h"
 
-/* Cray */
-#define HAVE_DMAPP_LOCK 1
-
 #define DEBUG 0
 
 
@@ -933,7 +930,7 @@ static void create_dmapp_locks(void)
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
     assert(l_state.local_lock_buf);
 
-    l_state.atomic_lock_buf = (void **)my_malloc(l_state.size * sizeof(void *));
+    l_state.atomic_lock_buf = (unsigned long *)my_malloc(l_state.size * sizeof(void *));
     assert(l_state.atomic_lock_buf);
 
     PARMCI_Malloc((l_state.atomic_lock_buf), sizeof(long));
@@ -1435,7 +1432,7 @@ int PARMCI_Create_mutexes(int num)
     /* create all of the mutexes */
     l_state.mutexes = (unsigned long**)my_malloc(l_state.size * sizeof(unsigned long*));
     assert(l_state.mutexes);
-    PARMCI_Malloc(l_state.mutexes, num*sizeof(unsigned long));
+    PARMCI_Malloc((void **)l_state.mutexes, num*sizeof(unsigned long));
     /* init all of my mutexes to 0 */
     for (i=0; i<num; ++i) {
         l_state.mutexes[l_state.rank][i] = 0;

@@ -260,6 +260,21 @@ AS_IF([test "x$happy" = xyes],
                      [*$ac_cv_search_gethugepagesize*], [],
                      [ARMCI_NETWORK_LIBS="$ARMCI_NETWORK_LIBS $ac_cv_search_gethugepagesize"])])])
 AS_IF([test "x$happy" = xyes],
+    [AC_SEARCH_LIBS([dmapp_init], [dmapp], [], [happy=no])
+     AS_CASE([$ac_cv_search_dmapp_init],
+        ["none required"], [],
+        [no], [],
+        [# add dmapp to ARMCI_NETWORK_LIBS if not there
+         AS_CASE([$ARMCI_NETWORK_LIBS],
+                 [*dmapp*], [],
+                 [ARMCI_NETWORK_LIBS="$ARMCI_NETWORK_LIBS -ldmapp"])])])
+AS_IF([test "x$happy" = xyes],
+    [AC_SEARCH_LIBS([dmapp_lock_acquire], [dmapp],
+        [AC_DEFINE([HAVE_DMAPP_LOCK], [1],
+               [Define to 1 if you have the `dmapp_lock' enabled library.])],
+        [AC_DEFINE([HAVE_DMAPP_LOCK], [0],
+               [Define to 1 if you have the `dmapp_lock' enabled library.])])])
+AS_IF([test "x$happy" = xyes],
     [ga_armci_network=GEMINI; with_gemini=yes; $1],
     [$2])
 ])dnl
