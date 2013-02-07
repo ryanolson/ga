@@ -247,19 +247,6 @@ happy=yes
 AS_IF([test "x$happy" = xyes],
     [AC_CHECK_HEADER([dmapp.h], [], [happy=no])])
 AS_IF([test "x$happy" = xyes],
-    [AC_SEARCH_LIBS([gethugepagesize], [hugetlbfs],
-        [AC_DEFINE([HAVE_LIBHUGETLBFS], [1],
-               [Define to 1 if you have the `hugetlbfs' library.])],
-        [AC_DEFINE([HAVE_LIBHUGETLBFS], [0],
-               [Define to 1 if you have the `hugetlbfs' library.])])
-     AS_CASE([$ac_cv_search_gethugepagesize],
-            ["none required"], [],
-            [no], [],
-            [# add missing lib to ARMCI_NETWORK_LIBS if not there
-             AS_CASE([$ARMCI_NETWORK_LIBS],
-                     [*$ac_cv_search_gethugepagesize*], [],
-                     [ARMCI_NETWORK_LIBS="$ARMCI_NETWORK_LIBS $ac_cv_search_gethugepagesize"])])])
-AS_IF([test "x$happy" = xyes],
     [AC_SEARCH_LIBS([dmapp_init], [dmapp], [], [happy=no])
      AS_CASE([$ac_cv_search_dmapp_init],
         ["none required"], [],
@@ -274,6 +261,19 @@ AS_IF([test "x$happy" = xyes],
                [Define to 1 if you have the `dmapp_lock' enabled library.])],
         [AC_DEFINE([HAVE_DMAPP_LOCK], [0],
                [Define to 1 if you have the `dmapp_lock' enabled library.])])])
+AS_IF([test "x$happy" = xyes],
+    [AC_SEARCH_LIBS([gethugepagesize], [hugetlbfs],
+        [AC_DEFINE([HAVE_LIBHUGETLBFS], [1],
+               [Define to 1 if you have the `hugetlbfs' library.])],
+        [AC_DEFINE([HAVE_LIBHUGETLBFS], [0],
+               [Define to 1 if you have the `hugetlbfs' library.])])
+     AS_CASE([$ac_cv_search_gethugepagesize],
+            ["none required"], [],
+            [no], [],
+            [# add missing lib to ARMCI_NETWORK_LIBS if not there
+             AS_CASE([$ARMCI_NETWORK_LIBS],
+                     [*$ac_cv_search_gethugepagesize*], [],
+                     [ARMCI_NETWORK_LIBS="$ARMCI_NETWORK_LIBS $ac_cv_search_gethugepagesize"])])])
 AS_IF([test "x$happy" = xyes],
     [ga_armci_network=GEMINI; with_gemini=yes; $1],
     [$2])
