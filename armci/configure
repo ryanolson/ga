@@ -15386,9 +15386,7 @@ case $ac_f77_v_output in
   # In fact, it will usually cause multiple definition errors.
   *ftnfe*)
     ac_f77_v_output="" ;;
-
 esac
-
 
   # look for -l* and *.a constructs in the output
   for ac_arg in $ac_f77_v_output; do
@@ -15483,9 +15481,7 @@ case $ac_f77_v_output in
   # In fact, it will usually cause multiple definition errors.
   *ftnfe*)
     ac_f77_v_output="" ;;
-
 esac
-
 
 
 ac_cv_f77_libs=
@@ -15773,9 +15769,7 @@ case $ac_f77_v_output in
   # In fact, it will usually cause multiple definition errors.
   *ftnfe*)
     ac_f77_v_output="" ;;
-
 esac
-
 
   # look for -l* and *.a constructs in the output
   for ac_arg in $ac_f77_v_output; do
@@ -15870,9 +15864,7 @@ case $ac_f77_v_output in
   # In fact, it will usually cause multiple definition errors.
   *ftnfe*)
     ac_f77_v_output="" ;;
-
 esac
-
 
 
 ac_cv_f77_libs=
