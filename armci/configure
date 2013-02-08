@@ -15381,6 +15381,12 @@ case $ac_f77_v_output in
   # If we are using Cray Fortran then delete quotes.
   *cft90*)
     ac_f77_v_output=`echo $ac_f77_v_output | sed 's/"//g'` ;;
+
+  # Using Cray Fortran, there is no need to use the verbose output.
+  # In fact, it will usually cause multiple definition errors.
+  *ftnfe*)
+    ac_f77_v_output="" ;;
+
 esac
 
 
@@ -15472,6 +15478,12 @@ case $ac_f77_v_output in
   # If we are using Cray Fortran then delete quotes.
   *cft90*)
     ac_f77_v_output=`echo $ac_f77_v_output | sed 's/"//g'` ;;
+
+  # Using Cray Fortran, there is no need to use the verbose output.
+  # In fact, it will usually cause multiple definition errors.
+  *ftnfe*)
+    ac_f77_v_output="" ;;
+
 esac
 
 
@@ -15756,6 +15768,12 @@ case $ac_f77_v_output in
   # If we are using Cray Fortran then delete quotes.
   *cft90*)
     ac_f77_v_output=`echo $ac_f77_v_output | sed 's/"//g'` ;;
+
+  # Using Cray Fortran, there is no need to use the verbose output.
+  # In fact, it will usually cause multiple definition errors.
+  *ftnfe*)
+    ac_f77_v_output="" ;;
+
 esac
 
 
@@ -15847,6 +15865,12 @@ case $ac_f77_v_output in
   # If we are using Cray Fortran then delete quotes.
   *cft90*)
     ac_f77_v_output=`echo $ac_f77_v_output | sed 's/"//g'` ;;
+
+  # Using Cray Fortran, there is no need to use the verbose output.
+  # In fact, it will usually cause multiple definition errors.
+  *ftnfe*)
+    ac_f77_v_output="" ;;
+
 esac
 
 
