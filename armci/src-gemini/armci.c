@@ -1,3 +1,6 @@
+/* -*- c-basic-offset: 4; indent-tabs-mode: nil; -*- */
+/* vim: set sw=4 ts=8 expandtab : */
+
 #if HAVE_CONFIG_H
 #   include "config.h"
 #endif
@@ -1809,6 +1812,11 @@ static void check_envs(void)
             armci_is_using_huge_pages = 0;
         }
     }
+    /* CRAY WORKAROUND: get_hugepage_region() currently fails on Cascade HW.
+     * This is related to the sysconf(_SC_LEVEL2_CACHE_LINESIZE) call
+     * incorrectly returning 0 */
+    if (sysconf(_SC_LEVEL2_CACHE_LINESIZE) == 0)
+        armci_is_using_huge_pages = 0;
 
     /* HUGETLB_DEFAULT_PAGE_SIZE
      *

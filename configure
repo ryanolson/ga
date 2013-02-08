@@ -26127,7 +26127,7 @@ lt_prog_compiler_static=
       lt_prog_compiler_static='-non_shared'
       ;;
 
-    linux* | k*bsd*-gnu | kopensolaris*-gnu)
+    *linux* | k*bsd*-gnu | kopensolaris*-gnu)
       case $cc_basename in
       # old Intel for x86_64 which still supported -KPIC.
       ecc*)
@@ -26160,6 +26160,12 @@ lt_prog_compiler_static=
 	lt_prog_compiler_wl='-Wl,'
 	lt_prog_compiler_pic='-fpic'
 	lt_prog_compiler_static='-Bstatic'
+        ;;
+      craycc | crayc++ | crayftn)
+        # Cray compilers
+	lt_prog_compiler_wl='-Wl,'
+	lt_prog_compiler_pic='-hPIC'
+	lt_prog_compiler_static='-static'
         ;;
       ccc*)
         lt_prog_compiler_wl='-Wl,'
@@ -31335,7 +31341,7 @@ lt_prog_compiler_static_CXX=
 	    ;;
 	esac
 	;;
-      linux* | k*bsd*-gnu | kopensolaris*-gnu)
+      *linux* | k*bsd*-gnu | kopensolaris*-gnu)
 	case $cc_basename in
 	  KCC*)
 	    # KAI C++ Compiler
@@ -31360,6 +31366,12 @@ lt_prog_compiler_static_CXX=
 	    lt_prog_compiler_wl_CXX='-Wl,'
 	    lt_prog_compiler_pic_CXX='-fpic'
 	    lt_prog_compiler_static_CXX='-Bstatic'
+	    ;;
+	  crayc++)
+	    # Cray C++ compiler
+	    lt_prog_compiler_wl_CXX='-Wl,'
+	    lt_prog_compiler_pic_CXX='-hPIC'
+	    lt_prog_compiler_static_CXX='-static'
 	    ;;
 	  cxx*)
 	    # Compaq C++
@@ -33008,7 +33020,7 @@ lt_prog_compiler_static_F77=
       lt_prog_compiler_static_F77='-non_shared'
       ;;
 
-    linux* | k*bsd*-gnu | kopensolaris*-gnu)
+    *linux* | k*bsd*-gnu | kopensolaris*-gnu)
       case $cc_basename in
       # old Intel for x86_64 which still supported -KPIC.
       ecc*)
@@ -33041,6 +33053,12 @@ lt_prog_compiler_static_F77=
 	lt_prog_compiler_wl_F77='-Wl,'
 	lt_prog_compiler_pic_F77='-fpic'
 	lt_prog_compiler_static_F77='-Bstatic'
+        ;;
+      craycc | crayc++ | crayftn)
+        # Cray compilers
+	lt_prog_compiler_wl_F77='-Wl,'
+	lt_prog_compiler_pic_F77='-hPIC'
+	lt_prog_compiler_static_F77='-static'
         ;;
       ccc*)
         lt_prog_compiler_wl_F77='-Wl,'

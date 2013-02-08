@@ -4037,7 +4037,7 @@ m4_if([$1], [CXX], [
 	    ;;
 	esac
 	;;
-      linux* | k*bsd*-gnu | kopensolaris*-gnu)
+      *linux* | k*bsd*-gnu | kopensolaris*-gnu)
 	case $cc_basename in
 	  KCC*)
 	    # KAI C++ Compiler
@@ -4062,6 +4062,12 @@ m4_if([$1], [CXX], [
 	    _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
 	    _LT_TAGVAR(lt_prog_compiler_pic, $1)='-fpic'
 	    _LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
+	    ;;
+	  crayc++)
+	    # Cray C++ compiler
+	    _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
+	    _LT_TAGVAR(lt_prog_compiler_pic, $1)='-hPIC'
+	    _LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
 	    ;;
 	  cxx*)
 	    # Compaq C++
@@ -4336,7 +4342,7 @@ m4_if([$1], [CXX], [
       _LT_TAGVAR(lt_prog_compiler_static, $1)='-non_shared'
       ;;
 
-    linux* | k*bsd*-gnu | kopensolaris*-gnu)
+    *linux* | k*bsd*-gnu | kopensolaris*-gnu)
       case $cc_basename in
       # old Intel for x86_64 which still supported -KPIC.
       ecc*)
@@ -4369,6 +4375,12 @@ m4_if([$1], [CXX], [
 	_LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
 	_LT_TAGVAR(lt_prog_compiler_pic, $1)='-fpic'
 	_LT_TAGVAR(lt_prog_compiler_static, $1)='-Bstatic'
+        ;;
+      craycc | crayc++ | crayftn)
+	#Cray compilers
+        _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
+        _LT_TAGVAR(lt_prog_compiler_pic, $1)='-hPIC'
+        _LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
         ;;
       ccc*)
         _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
