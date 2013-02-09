@@ -8901,6 +8901,144 @@ fi
 
 fi
 if test "x$happy" = xyes; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dmapp_init" >&5
+$as_echo_n "checking for library containing dmapp_init... " >&6; }
+if ${ac_cv_search_dmapp_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dmapp_init ();
+int
+main ()
+{
+return dmapp_init ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' dmapp; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_dmapp_init=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_dmapp_init+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_dmapp_init+:} false; then :
+
+else
+  ac_cv_search_dmapp_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dmapp_init" >&5
+$as_echo "$ac_cv_search_dmapp_init" >&6; }
+ac_res=$ac_cv_search_dmapp_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  happy=no
+fi
+
+     case $ac_cv_search_dmapp_init in #(
+  "none required") :
+     ;; #(
+  no) :
+     ;; #(
+  *) :
+    # add dmapp to ARMCI_NETWORK_LIBS if not there
+         case $ARMCI_NETWORK_LIBS in #(
+  *dmapp*) :
+     ;; #(
+  *) :
+    ARMCI_NETWORK_LIBS="$ARMCI_NETWORK_LIBS -ldmapp" ;;
+esac ;;
+esac
+fi
+if test "x$happy" = xyes; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dmapp_lock_acquire" >&5
+$as_echo_n "checking for library containing dmapp_lock_acquire... " >&6; }
+if ${ac_cv_search_dmapp_lock_acquire+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dmapp_lock_acquire ();
+int
+main ()
+{
+return dmapp_lock_acquire ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' dmapp; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_dmapp_lock_acquire=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_dmapp_lock_acquire+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_dmapp_lock_acquire+:} false; then :
+
+else
+  ac_cv_search_dmapp_lock_acquire=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dmapp_lock_acquire" >&5
+$as_echo "$ac_cv_search_dmapp_lock_acquire" >&6; }
+ac_res=$ac_cv_search_dmapp_lock_acquire
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+$as_echo "#define HAVE_DMAPP_LOCK 1" >>confdefs.h
+
+else
+
+$as_echo "#define HAVE_DMAPP_LOCK 0" >>confdefs.h
+
+fi
+
+fi
+if test "x$happy" = xyes; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing gethugepagesize" >&5
 $as_echo_n "checking for library containing gethugepagesize... " >&6; }
 if ${ac_cv_search_gethugepagesize+:} false; then :
@@ -9867,6 +10005,144 @@ else
   happy=no
 fi
 
+
+fi
+if test "x$happy" = xyes; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dmapp_init" >&5
+$as_echo_n "checking for library containing dmapp_init... " >&6; }
+if ${ac_cv_search_dmapp_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dmapp_init ();
+int
+main ()
+{
+return dmapp_init ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' dmapp; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_dmapp_init=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_dmapp_init+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_dmapp_init+:} false; then :
+
+else
+  ac_cv_search_dmapp_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dmapp_init" >&5
+$as_echo "$ac_cv_search_dmapp_init" >&6; }
+ac_res=$ac_cv_search_dmapp_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else
+  happy=no
+fi
+
+     case $ac_cv_search_dmapp_init in #(
+  "none required") :
+     ;; #(
+  no) :
+     ;; #(
+  *) :
+    # add dmapp to ARMCI_NETWORK_LIBS if not there
+         case $ARMCI_NETWORK_LIBS in #(
+  *dmapp*) :
+     ;; #(
+  *) :
+    ARMCI_NETWORK_LIBS="$ARMCI_NETWORK_LIBS -ldmapp" ;;
+esac ;;
+esac
+fi
+if test "x$happy" = xyes; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dmapp_lock_acquire" >&5
+$as_echo_n "checking for library containing dmapp_lock_acquire... " >&6; }
+if ${ac_cv_search_dmapp_lock_acquire+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dmapp_lock_acquire ();
+int
+main ()
+{
+return dmapp_lock_acquire ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' dmapp; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_dmapp_lock_acquire=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_dmapp_lock_acquire+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_dmapp_lock_acquire+:} false; then :
+
+else
+  ac_cv_search_dmapp_lock_acquire=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_dmapp_lock_acquire" >&5
+$as_echo "$ac_cv_search_dmapp_lock_acquire" >&6; }
+ac_res=$ac_cv_search_dmapp_lock_acquire
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+$as_echo "#define HAVE_DMAPP_LOCK 1" >>confdefs.h
+
+else
+
+$as_echo "#define HAVE_DMAPP_LOCK 0" >>confdefs.h
+
+fi
 
 fi
 if test "x$happy" = xyes; then :
@@ -15321,8 +15597,12 @@ case $ac_f77_v_output in
   # If we are using Cray Fortran then delete quotes.
   *cft90*)
     ac_f77_v_output=`echo $ac_f77_v_output | sed 's/"//g'` ;;
-esac
 
+  # Using Cray Fortran, there is no need to use the verbose output.
+  # In fact, it will usually cause multiple definition errors.
+  *ftnfe*)
+    ac_f77_v_output="" ;;
+esac
 
   # look for -l* and *.a constructs in the output
   for ac_arg in $ac_f77_v_output; do
@@ -15412,8 +15692,12 @@ case $ac_f77_v_output in
   # If we are using Cray Fortran then delete quotes.
   *cft90*)
     ac_f77_v_output=`echo $ac_f77_v_output | sed 's/"//g'` ;;
-esac
 
+  # Using Cray Fortran, there is no need to use the verbose output.
+  # In fact, it will usually cause multiple definition errors.
+  *ftnfe*)
+    ac_f77_v_output="" ;;
+esac
 
 
 ac_cv_f77_libs=
@@ -15696,8 +15980,12 @@ case $ac_f77_v_output in
   # If we are using Cray Fortran then delete quotes.
   *cft90*)
     ac_f77_v_output=`echo $ac_f77_v_output | sed 's/"//g'` ;;
-esac
 
+  # Using Cray Fortran, there is no need to use the verbose output.
+  # In fact, it will usually cause multiple definition errors.
+  *ftnfe*)
+    ac_f77_v_output="" ;;
+esac
 
   # look for -l* and *.a constructs in the output
   for ac_arg in $ac_f77_v_output; do
@@ -15787,8 +16075,12 @@ case $ac_f77_v_output in
   # If we are using Cray Fortran then delete quotes.
   *cft90*)
     ac_f77_v_output=`echo $ac_f77_v_output | sed 's/"//g'` ;;
-esac
 
+  # Using Cray Fortran, there is no need to use the verbose output.
+  # In fact, it will usually cause multiple definition errors.
+  *ftnfe*)
+    ac_f77_v_output="" ;;
+esac
 
 
 ac_cv_f77_libs=
@@ -25851,7 +26143,7 @@ lt_prog_compiler_static=
       lt_prog_compiler_static='-non_shared'
       ;;
 
-    linux* | k*bsd*-gnu | kopensolaris*-gnu)
+    *linux* | k*bsd*-gnu | kopensolaris*-gnu)
       case $cc_basename in
       # old Intel for x86_64 which still supported -KPIC.
       ecc*)
@@ -25884,6 +26176,12 @@ lt_prog_compiler_static=
 	lt_prog_compiler_wl='-Wl,'
 	lt_prog_compiler_pic='-fpic'
 	lt_prog_compiler_static='-Bstatic'
+        ;;
+      craycc | crayc++ | crayftn)
+        # Cray compilers
+	lt_prog_compiler_wl='-Wl,'
+	lt_prog_compiler_pic='-hPIC'
+	lt_prog_compiler_static='-static'
         ;;
       ccc*)
         lt_prog_compiler_wl='-Wl,'
@@ -31059,7 +31357,7 @@ lt_prog_compiler_static_CXX=
 	    ;;
 	esac
 	;;
-      linux* | k*bsd*-gnu | kopensolaris*-gnu)
+      *linux* | k*bsd*-gnu | kopensolaris*-gnu)
 	case $cc_basename in
 	  KCC*)
 	    # KAI C++ Compiler
@@ -31084,6 +31382,12 @@ lt_prog_compiler_static_CXX=
 	    lt_prog_compiler_wl_CXX='-Wl,'
 	    lt_prog_compiler_pic_CXX='-fpic'
 	    lt_prog_compiler_static_CXX='-Bstatic'
+	    ;;
+	  crayc++)
+	    # Cray C++ compiler
+	    lt_prog_compiler_wl_CXX='-Wl,'
+	    lt_prog_compiler_pic_CXX='-hPIC'
+	    lt_prog_compiler_static_CXX='-static'
 	    ;;
 	  cxx*)
 	    # Compaq C++
@@ -32732,7 +33036,7 @@ lt_prog_compiler_static_F77=
       lt_prog_compiler_static_F77='-non_shared'
       ;;
 
-    linux* | k*bsd*-gnu | kopensolaris*-gnu)
+    *linux* | k*bsd*-gnu | kopensolaris*-gnu)
       case $cc_basename in
       # old Intel for x86_64 which still supported -KPIC.
       ecc*)
@@ -32765,6 +33069,12 @@ lt_prog_compiler_static_F77=
 	lt_prog_compiler_wl_F77='-Wl,'
 	lt_prog_compiler_pic_F77='-fpic'
 	lt_prog_compiler_static_F77='-Bstatic'
+        ;;
+      craycc | crayc++ | crayftn)
+        # Cray compilers
+	lt_prog_compiler_wl_F77='-Wl,'
+	lt_prog_compiler_pic_F77='-hPIC'
+	lt_prog_compiler_static_F77='-static'
         ;;
       ccc*)
         lt_prog_compiler_wl_F77='-Wl,'

@@ -30,8 +30,8 @@ c***  Intitialize a message passing library
 c
 #ifdef MPI
       integer ierr
-      tbeg = ga_wtime()
       call mpi_init(ierr)
+      tbeg = ga_wtime()
 #else
       tbeg = ga_wtime()
       call pbeginf

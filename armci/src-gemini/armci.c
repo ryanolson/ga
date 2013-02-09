@@ -26,9 +26,6 @@
 #include "parmci.h"
 #include "reg_cache.h"
 
-/* Cray */
-#define HAVE_DMAPP_LOCK 1
-
 #define DEBUG 0
 
 
@@ -964,7 +961,7 @@ static void create_dmapp_locks(void)
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
     assert(l_state.local_lock_buf);
 
-    l_state.atomic_lock_buf = (unsigned long **)my_malloc(l_state.size * sizeof(void *));
+    l_state.atomic_lock_buf = (unsigned long *)my_malloc(l_state.size * sizeof(void *));
     assert(l_state.atomic_lock_buf);
 
     PARMCI_Malloc((void **)(l_state.atomic_lock_buf), sizeof(long));
@@ -1843,6 +1840,11 @@ static void check_envs(void)
             armci_is_using_huge_pages = 0;
         }
     }
+    /* CRAY WORKAROUND: get_hugepage_region() currently fails on Cascade HW.
+     * This is related to the sysconf(_SC_LEVEL2_CACHE_LINESIZE) call
+     * incorrectly returning 0 */
+    if (sysconf(_SC_LEVEL2_CACHE_LINESIZE) == 0)
+        armci_is_using_huge_pages = 0;
 
     /* HUGETLB_DEFAULT_PAGE_SIZE
      *
