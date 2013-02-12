@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <hugetlbfs.h>
 #include <errno.h>
+#include <sched.h>
 
 /* 3rd party headers */
 #include <mpi.h>
@@ -45,8 +46,10 @@ static int use_locks_on_put = 0;
 local_state l_state;
 int armci_me=-1;
 int armci_nproc=-1;
+
 /* XPMEM support */
-int armci_uses_shm = 1;
+int armci_uses_shm = HAVE_XPMEM;
+#define XPMEM_MIN_SIZE_ALIGN (sizeof(long))
 
 MPI_Comm ARMCI_COMM_WORLD;
 
@@ -205,7 +208,7 @@ void PARMCI_Copy(void *src, void *dst, int n)
 {
     unsigned long x = ((unsigned long) src | (unsigned long) dst) | n;
 
-    if (armci_use_system_memcpy || (x & sizeof(long)-1))
+    if (armci_use_system_memcpy || (x & (XPMEM_MIN_SIZE_ALIGN-1)))
         memcpy(dst, src, n);
     else {
         _cray_armci_memcpy(dst, src, n);
@@ -248,13 +251,15 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
     dst_reg = reg_cache_find(proc, dst, bytes);
     assert(dst_reg);
 
+#if HAVE_XPMEM
     /* XPMEM optimisation */
     if (armci_uses_shm && ARMCI_Same_node(proc)) {
         unsigned long offset = (unsigned long) dst - (unsigned long)dst_reg->mr.seg.addr;
-        void *xpmem_addr = dst_reg->mr.vaddr + offset;
+        void *xpmem_addr = (void *) ((unsigned long)dst_reg->mr.vaddr + offset);
         PARMCI_Copy(src, xpmem_addr, bytes);
         return status;
     }
+#endif
 
     /* If the number of bytes is even, use Double word datatype,
      * DMAPP_BYTE performance is much worse */
@@ -313,13 +318,15 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     src_reg = reg_cache_find(proc, src, bytes);
     assert(src_reg);
 
+#if HAVE_XPMEM
     /* XPMEM optimisation */
     if (armci_uses_shm && ARMCI_Same_node(proc)) {
         unsigned long offset = (unsigned long) src - (unsigned long)src_reg->mr.seg.addr;
-        void *xpmem_addr = src_reg->mr.vaddr + offset;
+        void *xpmem_addr = (void *) ((unsigned long) src_reg->mr.vaddr + offset);
         PARMCI_Copy(xpmem_addr, dst, bytes);
         return status;
     }
+#endif
 
     /* If the number of bytes is even, use Double word datatype,
      * DMAPP_BYTE performance is much worse */
@@ -961,7 +968,7 @@ static void create_dmapp_locks(void)
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
     assert(l_state.local_lock_buf);
 
-    l_state.atomic_lock_buf = (unsigned long *)my_malloc(l_state.size * sizeof(void *));
+    l_state.atomic_lock_buf = (unsigned long **)my_malloc(l_state.size * sizeof(void *));
     assert(l_state.atomic_lock_buf);
 
     PARMCI_Malloc((void **)(l_state.atomic_lock_buf), sizeof(long));
@@ -1090,8 +1097,10 @@ int PARMCI_Init()
     /* Initialize */
     dmapp_initialize();
 
+#if HAVE_XPMEM
     /* XPMEM support: Determine SMP/Cluster node info */
     armci_init_clusinfo();
+#endif
 
     // Create locks
     create_dmapp_locks();
@@ -1635,6 +1644,7 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
     MPI_Allgather(&src_buf, sizeof(void *), MPI_BYTE, ptrs,
             sizeof(void *), MPI_BYTE, comm);
 
+#if HAVE_XPMEM
     /* XPMEM support */
     if (armci_uses_shm) {
         /* 1. Make our memory segment available to other processes. */
@@ -1645,6 +1655,7 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
             armci_die("xpmem_make failed", errno);
         }
     }
+#endif
 
     /* allocate receive buffer for exchange of registration info */
     allgather_mr_info = (armci_mr_info_t *)my_malloc(sizeof(armci_mr_info_t) * comm_size);
@@ -1660,6 +1671,7 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
         if (i == comm_rank)
             continue;
 
+#if HAVE_XPMEM
         /* XPMEM optimisation */
         if (armci_uses_shm && ARMCI_SAMECLUSNODE(world_rank)) {
             xpmem_apid_t apid;
@@ -1682,6 +1694,7 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
             allgather_mr_info[i].apid  = apid;
             allgather_mr_info[i].vaddr = vaddr;
         }
+#endif
 
         reg_cache_insert(world_rank, ptrs[i], size, &allgather_mr_info[i]);
     }
@@ -1889,6 +1902,7 @@ static void check_envs(void)
         armci_page_size = sc_page_size;
     }
 
+#if HAVE_XPMEM
     /* XPMEM support */
     if ((value = getenv("ARMCI_USE_XPMEM")) != NULL) {
         if (0 == strncasecmp(value, "y", 1)) {
@@ -1907,6 +1921,7 @@ static void check_envs(void)
             armci_use_system_memcpy = 0;
         }
     }
+#endif
 
 }
 

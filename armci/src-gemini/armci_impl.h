@@ -3,7 +3,9 @@
 
 #include <dmapp.h>
 #include <mpi.h>
+#if HAVE_XPMEM
 #include <xpmem.h>
+#endif
 
 #define ARMCI_DMAPP_OFFLOAD_THRESHOLD 2048
 #define MAX_NB_OUTSTANDING 1024
@@ -30,7 +32,7 @@ extern ARMCI_Group armci_smp_group; /* ARMCI group for local SMP ranks */
 /* Optimised memcpy implementation */
 extern void *(*_cray_armci_memcpy)(void *dest, const void *src, size_t n);
 extern void *_cray_mpi_memcpy_snb(void *dest, const void *src, size_t n);
-extern void *_cray_mpi_memcpy_int(void *dest, const void *src, size_t n);
+extern void *cray_memcpy(void *dest, const void *src, size_t n);
 extern int armci_use_system_memcpy;
 
 /* Convert rank to node index. Supports Block(1) and Cyclic(0) layouts only */
@@ -73,10 +75,12 @@ extern local_state l_state;
 
 typedef struct armci_mr_info {
     dmapp_seg_desc_t seg;     /* DMAPP memory registration seg */
+    long             length;  /* length of the data segment */
+#if HAVE_XPMEM
     xpmem_segid_t    segid;   /* xpmem handle for data segment of remote PE */
     xpmem_apid_t     apid;    /* access permit ID for that data segment */
-    long             length;  /* length of the data segment */
-    void            *vaddr;   /* vaddr at which the XPMEM mapping was created */
+    void             *vaddr;  /* vaddr at which the XPMEM mapping was created */
+#endif
 } armci_mr_info_t;
 
 #endif /* ARMCI_IMPL_H_ */

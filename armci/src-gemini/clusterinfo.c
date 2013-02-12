@@ -109,19 +109,14 @@ armci_init_memcpy(void)
         _cray_armci_memcpy = NULL;
     }
 
-    if (genuine_intel) {
+    if (genuine_intel && (family == 6 && model >= 0x2d)) {
+        /* Intel Sandy Bridge (0x2d) & Ivy Bridge (0x3e) */
         _cray_armci_memcpy = _cray_mpi_memcpy_snb;
         armci_use_system_memcpy = 0;
-    } else if (authentic_amd) {
-#if 1
-        /* Use system default for now.  Optimized version for Interlagos
-         * (v10) produces wrong answers / failed tests. */
-        armci_use_system_memcpy = 1;
-        _cray_armci_memcpy = NULL;
-#else
-        _cray_armci_memcpy = _cray_mpi_memcpy_int;
+    } else if (authentic_amd && family >= 21) {
+    	/* Interlagos */
+        _cray_armci_memcpy = cray_memcpy;
         armci_use_system_memcpy = 0;
-#endif
     } else {
         /* Unknown vendor id? */
         armci_use_system_memcpy = 1;

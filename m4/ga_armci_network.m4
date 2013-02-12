@@ -275,6 +275,12 @@ AS_IF([test "x$happy" = xyes],
                      [*$ac_cv_search_gethugepagesize*], [],
                      [ARMCI_NETWORK_LIBS="$ARMCI_NETWORK_LIBS $ac_cv_search_gethugepagesize"])])])
 AS_IF([test "x$happy" = xyes],
+    [AC_SEARCH_LIBS([xpmem_make], [xpmem],
+        [AC_DEFINE([HAVE_XPMEM], [1],
+               [Define to 1 if you have the `xpmem' library.])],
+        [AC_DEFINE([HAVE_XPMEM], [0],
+               [Define to 1 if you have the `xpmem' library.])])])
+AS_IF([test "x$happy" = xyes],
     [ga_armci_network=GEMINI; with_gemini=yes; $1],
     [$2])
 ])dnl

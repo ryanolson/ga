@@ -419,6 +419,9 @@
 /* Define to 1 if you have the `xdr_char' function. */
 #undef HAVE_XDR_CHAR
 
+/* Define to 1 if you have the `xpmem' library. */
+#undef HAVE_XPMEM
+
 /* Define to 1 if you have the `_acquire_lock' function. */
 #undef HAVE__ACQUIRE_LOCK
 
