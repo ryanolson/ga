@@ -619,7 +619,12 @@ int PARMCI_AccS(int datatype, void *scale,
         get_buf = l_state.acc_buf;
     }
     else {
-        get_buf = (char *)my_malloc(sizeof(char) * sizetogetput);
+#if HAVE_XPMEM
+        /* XPMEM optimisation */
+        if (!armci_uses_shm || !ARMCI_Same_node(proc))
+#endif
+            // allocate the temporary buffer
+            get_buf = (char *)my_malloc(sizeof(char) * sizetogetput);
     }
 
     assert(get_buf);
@@ -650,10 +655,27 @@ int PARMCI_AccS(int datatype, void *scale,
                 dst_bvalue[j] = 0;
             }
         }
-        // allocate the temporary buffer
 
-        // Get the remote data in a temp buffer
-        PARMCI_Get((char *)dst_ptr + dst_idx, get_buf, sizetogetput, proc);
+#if HAVE_XPMEM
+        /* XPMEM optimisation */
+        if (armci_uses_shm && ARMCI_Same_node(proc)) {
+            reg_entry_t *dst_reg;
+            unsigned long offset;
+
+            get_buf = (char *)dst_ptr + dst_idx;
+
+            if (l_state.rank != proc) {
+                /* Find the dest memory region mapping */
+                dst_reg = reg_cache_find(proc, get_buf, sizetogetput);
+                assert(dst_reg);
+                offset = (unsigned long) get_buf - (unsigned long)dst_reg->mr.seg.addr;
+                get_buf = (void *) ((unsigned long)dst_reg->mr.vaddr + offset);
+            }
+        }
+        else
+#endif
+            // Get the remote data in a temp buffer
+            PARMCI_Get((char *)dst_ptr + dst_idx, get_buf, sizetogetput, proc);
 
 #define EQ_ONE_REG(A) ((A) == 1.0)
 #define EQ_ONE_CPL(A) ((A).real == 1.0 && (A).imag == 0.0)
@@ -697,10 +719,12 @@ int PARMCI_AccS(int datatype, void *scale,
 #undef IADD_SCALE_REG
 #undef IADD_SCALE_CPL
 
+#if HAVE_XPMEM
+    /* XPMEM optimisation */
+    if (!armci_uses_shm || !ARMCI_Same_node(proc))
+#endif
         // Write back
         PARMCI_Put(get_buf, (char *)dst_ptr + dst_idx, sizetogetput, proc);
-
-        // free temp buffer
     }
     PARMCI_WaitProc(proc);
 
@@ -712,8 +736,13 @@ int PARMCI_AccS(int datatype, void *scale,
     use_locks_on_put = lock_on_put;
 #endif
 
-    if (sizetogetput > l_state.acc_buf_len)
-        my_free(get_buf);
+#if HAVE_XPMEM
+    /* XPMEM optimisation */
+    if (!armci_uses_shm || !ARMCI_Same_node(proc))
+#endif
+        // free temp buffer
+        if (sizetogetput > l_state.acc_buf_len)
+            my_free(get_buf);
 
     return 0;
 }
