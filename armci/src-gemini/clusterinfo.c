@@ -292,6 +292,23 @@ void armci_init_clusinfo(void)
 
 /* Locality functions */
 
+int armci_domain_nprocs(armci_domain_t domain, int id)
+{
+    return armci_npes_on_smp;
+}
+
+
+int armci_domain_id(armci_domain_t domain, int glob_proc_id)
+{
+    return glob_proc_id;
+}
+
+
+int armci_domain_glob_proc_id(armci_domain_t domain, int id, int loc_proc_id)
+{
+    return id;
+}
+
 /*\ find cluster node id the specified process is on
 \*/
 int armci_clus_id(int p)
