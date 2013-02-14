@@ -31,8 +31,6 @@ int          *armci_pes_on_smp;            /* array of local SMP ranks   */
 int           armci_smp_index = -1;        /* our index within local SMP */
 int           armci_rank_order = 1;        /* Rank reorder method: smp (block cyclic) default */
 
-int          *armci_pe_node;               /* array to convert from PE to logical node idx */
-int          *armci_node_leader;           /* array to convert from node idx to leader PE rank */
 int           armci_npes_per_node;         /* maximum pes per node of the job */
 
 int           armci_clus_me = -1;          /* my node index */
@@ -41,6 +39,8 @@ int           armci_nclus = -1;            /* number of nodes that make up job *
 ARMCI_Group   armci_smp_group = -1;        /* ARMCI group for local SMP ranks */
 
 /* Optimised memcpy implementation */
+extern void *_cray_armci_memcpy_snb(void *dest, const void *src, size_t n);
+extern void *_cray_armci_memcpy_amd(void *dest, const void *src, size_t n);
 void *(*_cray_armci_memcpy)(void *dest, const void *src, size_t n) = NULL;
 int armci_use_system_memcpy = 0;
 
@@ -111,14 +111,14 @@ armci_init_memcpy(void)
 
     if (genuine_intel && (family == 6 && model >= 0x2d)) {
         /* Intel Sandy Bridge (0x2d) & Ivy Bridge (0x3e) */
-        _cray_armci_memcpy = _cray_mpi_memcpy_snb;
+        _cray_armci_memcpy = _cray_armci_memcpy_snb;
         armci_use_system_memcpy = 0;
     } else if (authentic_amd && family >= 21) {
-    	/* Interlagos */
-        _cray_armci_memcpy = cray_memcpy;
+    	/* AMD Interlagos */
+        _cray_armci_memcpy = _cray_armci_memcpy_amd;
         armci_use_system_memcpy = 0;
     } else {
-        /* Unknown vendor id? */
+        /* Unknown vendor/family/model id? */
         armci_use_system_memcpy = 1;
         _cray_armci_memcpy = NULL;
     }
@@ -184,19 +184,6 @@ error:
         return -1;
 }
 
-
-/* Compare fn for qsort() below */
-static int
-compare_ints(const void* px, const void* py)
-{
-    int x;
-    int y;
-
-    x = *((const int*)px);
-    y = *((const int*)py);
-
-    return x - y;
-}
 
 /* armci_get_jobptopo generates job topological using info from PMI.
  * Returns the maximum number of ranks per node and the number of nodes
@@ -292,42 +279,91 @@ void armci_init_clusinfo(void)
 
 /* Locality functions */
 
+/*
+  int armci_domain_id(armci_domain_t domain, int glob_proc_id)
+
+  PURPOSE: return number of processes/tasks in locality domain represented by id.
+  ARGUMENTS:
+  	domain - domain name
+  	id     - identifier of a node within the locality domain, value < 0 means my node
+  RETURN VALUE:
+   	< 0         - error
+   	other value - number of processes/tasks (0, ..., armci_domain_count(domain)-1)
+*/
 int armci_domain_nprocs(armci_domain_t domain, int id)
 {
+    /* TODO: This may not be correct for the last node in job */
     return armci_npes_on_smp;
 }
 
+/*
+  int armci_domain_count(armci_domain_t domain
 
-int armci_domain_id(armci_domain_t domain, int glob_proc_id)
-{
-    return glob_proc_id;
-}
-
-
-int armci_domain_glob_proc_id(armci_domain_t domain, int id, int loc_proc_id)
-{
-    return id;
-}
-
-/*\ find cluster node id the specified process is on
-\*/
-int armci_clus_id(int p)
-{
-    assert(p >= 0 && p < armci_nproc);
-    assert(armci_pe_node);
-
-    return armci_pe_node[p];
-}
-
-/* return number of nodes in given domain */
+  PURPOSE: return number of nodes in specified locality domain.
+  ARGUMENTS:
+	domain - domain name
+  RETURN VALUE:
+ 	<  0        - error
+	other value - number of nodes
+*/
 int armci_domain_count(armci_domain_t domain)
 {
     assert(armci_nclus >= 0);
     return armci_nclus;
 }
 
-/* return ID of domain that the calling process belongs to
- */
+/*
+  int armci_domain_id(armci_domain_t domain, int glob_proc_id)
+
+  PURPOSE: return local process id within a domain based on its global process/task id
+  ARGUMENTS:
+	domain       - domain name
+	glob_proc_id - global process/task id
+  RETURN VALUE
+ 	< 0         - error
+ 	other value - local process/task id
+*/
+int armci_domain_id(armci_domain_t domain, int glob_proc_id)
+{
+    assert(armci_nclus >= 0);
+    if (glob_proc_id < 0 || glob_proc_id >= armci_nproc)
+        return -1;
+
+    return ARMCI_RANK2LINDEX(glob_proc_id);
+}
+
+/*
+  int armci_domain_glob_proc_id(armci_domain_t domain, int id, int loc_proc_id)
+
+  PURPOSE: Returns global process/task id based on its id in a given locality domain node
+  ARGUMENTS:
+	domain      - domain name
+	id          - identifier of a node within the locality domain, value < 0 means my node
+        loc_proc_id - local id within domain
+  RETURN VALUE:
+	< 0 - error
+	other value - process/task id
+*/
+int armci_domain_glob_proc_id(armci_domain_t domain, int id, int loc_proc_id)
+{
+    assert(armci_clus_me >= 0);
+    if (id >= armci_nclus || loc_proc_id < 0 || loc_proc_id >= armci_npes_per_node)
+        return -1;
+
+    if (id < 0)
+        id = armci_clus_me;
+
+    return ARMCI_RANK(id, loc_proc_id);
+}
+
+/*
+  int armci_domain_my_id(armci_domain_t domain)
+
+  PURPOSE: Returns id node in specified domain the calling process/task belongs to
+  ARGUMENTS:
+	domain - domain name
+  RETURN VALUE: id of domain
+*/
 int armci_domain_my_id(armci_domain_t domain)
 {
     assert(armci_clus_me >= 0);
@@ -338,6 +374,16 @@ int armci_domain_my_id(armci_domain_t domain)
 int armci_domain_same_id(armci_domain_t domain, int proc)
 {
     assert(armci_clus_me >= 0);
-
     return ARMCI_SAMECLUSNODE(proc);
 }
+
+/*\ find cluster node id the specified process is on
+\*/
+int armci_clus_id(int p)
+{
+    assert(p >= 0 && p < armci_nproc);
+
+    return ARMCI_RANK2NODE(p);
+}
+
+
