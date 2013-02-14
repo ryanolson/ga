@@ -1,3 +1,10 @@
+#
+# Copyright  2013  Cray Inc.  All Rights Reserved.
+#
+# This is /cray/css/users/cja/cray_memcpy.15.s
+# memcpy implementation optimzied for Sandy Bridge (SNB) hardware.
+# Written by Chris Ashton (cja)
+#
 # vim: ts=8:sts=4:sw=4:et
 
 # FIXMEs:
@@ -28,15 +35,15 @@
 # v.6: change remaining SSE to AVX equivalent
 
 .text
-    .globl  cray_memcpy
-    .type   cray_memcpy,@function
-    .globl  cray_memcpy_
-    .type   cray_memcpy_,@function
+    .globl  _cray_armci_memcpy_amd
+    .type   _cray_armci_memcpy_amd,@function
+    .globl  _cray_armci_memcpy_amd_
+    .type   _cray_armci_memcpy_amd_,@function
 
 .align 32
-cray_memcpy:
-cray_memcpy_:
-__cray_memcpy:
+_cray_armci_memcpy_amd:
+_cray_armci_memcpy_amd_:
+__cray_armci_memcpy_amd:
     # __dst = %rdi
     # __src = %rsi
     # __n   = %rdx
@@ -44,15 +51,15 @@ __cray_memcpy:
     mov     %rdi, %rax  # rax = return value
 
     cmp     $256, %rdx
-    jge     __cray_memcpy_large
+    jge     __cray_armci_memcpy_large
 
 #    test    $0xf0, %rdx
-#    jz      __cray_memcpy_15B
+#    jz      __cray_armci_memcpy_15B
 
 ########### Small Path #############
-__cray_memcpy_255B:
+__cray_armci_memcpy_255B:
     test    $128, %rdx
-    jz      __cray_memcpy_127B
+    jz      __cray_armci_memcpy_127B
 
     vmovups 0x00(%rsi), %xmm0
     vmovups 0x10(%rsi), %xmm1
@@ -73,11 +80,11 @@ __cray_memcpy_255B:
     add     $128, %rsi
     add     $128, %rdi
     sub     $128, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*128 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*128 size
 
-__cray_memcpy_127B:
+__cray_armci_memcpy_127B:
     test    $64, %rdx
-    jz      __cray_memcpy_63B
+    jz      __cray_armci_memcpy_63B
 
     vmovups 0x00(%rsi), %xmm0
     vmovups 0x10(%rsi), %xmm1
@@ -90,11 +97,11 @@ __cray_memcpy_127B:
     add     $64, %rsi
     add     $64, %rdi
     sub     $64, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*64 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*64 size
 
-__cray_memcpy_63B:
+__cray_armci_memcpy_63B:
     test    $32, %rdx
-    jz      __cray_memcpy_31B
+    jz      __cray_armci_memcpy_31B
 
     vmovups 0x00(%rsi), %xmm0
     vmovups 0x10(%rsi), %xmm1
@@ -103,44 +110,44 @@ __cray_memcpy_63B:
     add     $32, %rsi
     add     $32, %rdi
     sub     $32, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*32 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*32 size
 
-__cray_memcpy_31B:
+__cray_armci_memcpy_31B:
     test    $16, %rdx
-    jz      __cray_memcpy_15B
+    jz      __cray_armci_memcpy_15B
 
     vmovups 0x00(%rsi), %xmm0
     vmovups %xmm0, 0x00(%rdi)
     add     $16, %rsi
     add     $16, %rdi
     sub     $16, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*16 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*16 size
 
-__cray_memcpy_15B:
+__cray_armci_memcpy_15B:
     test    $8, %rdx
-    jz      __cray_memcpy_7B
+    jz      __cray_armci_memcpy_7B
 
     mov     0x00(%rsi), %r8
     mov     %r8, 0x00(%rdi)
     add     $8, %rsi
     add     $8, %rdi
     sub     $8, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*8 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*8 size
 
-__cray_memcpy_7B:
+__cray_armci_memcpy_7B:
     test    $4, %rdx
-    jz      __cray_memcpy_3B
+    jz      __cray_armci_memcpy_3B
 
     mov     0x00(%rsi), %r8d
     mov     %r8d, 0x00(%rdi)
     add     $4, %rsi
     add     $4, %rdi
     sub     $4, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*4 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*4 size
 
-__cray_memcpy_3B:
+__cray_armci_memcpy_3B:
     test    $2, %rdx
-    jz      __cray_memcpy_1B
+    jz      __cray_armci_memcpy_1B
 
     mov     0x00(%rsi), %r8w
     mov     %r8w, 0x00(%rdi)
@@ -148,35 +155,35 @@ __cray_memcpy_3B:
     add     $2, %rdi
     sub     $2, %rdx
 
-__cray_memcpy_1B:
+__cray_armci_memcpy_1B:
     test    $1, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     mov     0x00(%rsi), %r8b
     mov     %r8b, 0x00(%rdi)
 
-__cray_memcpy_ret:
+__cray_armci_memcpy_ret:
     ret
 
 ################ Large Path #############
-__cray_memcpy_large:
+__cray_armci_memcpy_large:
     mov     %rdi, %r10
     or      %rsi, %r10
     and     $31, %r10
-    jnz     __cray_memcpy_unaligned
+    jnz     __cray_armci_memcpy_unaligned
 
 ##################################################
 ############## 32B Aligned Large Loop ############
 ##################################################
-__cray_memcpy_32B_aligned:
+__cray_armci_memcpy_32B_aligned:
     cmp     $255, %rdx
-    jle     __cray_memcpy_32B_aligned_range1_255B
+    jle     __cray_armci_memcpy_32B_aligned_range1_255B
 
     cmp     $4*1024, %rdx
-    jl      __cray_memcpy_32B_aligned_range1_entry
+    jl      __cray_armci_memcpy_32B_aligned_range1_entry
 
     cmp     $1024*1024, %rdx
-    jl      __cray_memcpy_32B_aligned_range2_entry
+    jl      __cray_armci_memcpy_32B_aligned_range2_entry
 
 ############
 # For Range 3 [2^20B,],
@@ -186,7 +193,7 @@ __cray_memcpy_32B_aligned:
 # [X] NT loads
 # [X] NT stores
 ############
-__cray_memcpy_32B_aligned_range3_entry:
+__cray_armci_memcpy_32B_aligned_range3_entry:
     prefetchnta 0x000(%rsi)
     prefetchnta 0x040(%rsi)
     prefetchnta 0x080(%rsi)
@@ -201,7 +208,7 @@ __cray_memcpy_32B_aligned_range3_entry:
     prefetchnta 0x2c0(%rsi)
 
 .align 32
-__cray_memcpy_32B_aligned_range3_256B_loop:
+__cray_armci_memcpy_32B_aligned_range3_256B_loop:
     prefetchnta 0x300(%rsi)
     prefetchnta 0x340(%rsi)
     prefetchnta 0x380(%rsi)
@@ -248,18 +255,18 @@ __cray_memcpy_32B_aligned_range3_256B_loop:
     add     $128, %rdi
     sub     $256, %rdx
     cmp     $255, %rdx
-    jg      __cray_memcpy_32B_aligned_range3_256B_loop
+    jg      __cray_armci_memcpy_32B_aligned_range3_256B_loop
 
-__cray_memcpy_32B_aligned_range3_255B:
+__cray_armci_memcpy_32B_aligned_range3_255B:
     sfence
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
-__cray_memcpy_32B_aligned_range3_32B_loop:
+__cray_armci_memcpy_32B_aligned_range3_32B_loop:
     vmovntdqa 0x00(%rsi), %xmm0
     vmovntdq %xmm0, 0x00(%rdi)
     vmovntdqa 0x10(%rsi), %xmm1
@@ -269,14 +276,14 @@ __cray_memcpy_32B_aligned_range3_32B_loop:
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_32B_aligned_range3_32B_loop
+    jg      __cray_armci_memcpy_32B_aligned_range3_32B_loop
 
     sfence
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
-    jmp     __cray_memcpy_31B
+    jmp     __cray_armci_memcpy_31B
 
 ############
 # For Range 2 [2^12B,2^20B],
@@ -286,7 +293,7 @@ __cray_memcpy_32B_aligned_range3_32B_loop:
 # [ ] NT loads
 # [ ] NT stores
 ############
-__cray_memcpy_32B_aligned_range2_entry:
+__cray_armci_memcpy_32B_aligned_range2_entry:
     prefetcht0 0x000(%rsi)
     prefetcht0 0x040(%rsi)
     prefetcht0 0x080(%rsi)
@@ -301,7 +308,7 @@ __cray_memcpy_32B_aligned_range2_entry:
     prefetcht0 0x2c0(%rsi)
 
 .align 32
-__cray_memcpy_32B_aligned_range2_256B_loop:
+__cray_armci_memcpy_32B_aligned_range2_256B_loop:
     prefetcht0 0x300(%rsi)
     prefetcht0 0x340(%rsi)
     prefetcht0 0x380(%rsi)
@@ -348,17 +355,17 @@ __cray_memcpy_32B_aligned_range2_256B_loop:
     add     $128, %rdi
     sub     $256, %rdx
     cmp     $255, %rdx
-    jg      __cray_memcpy_32B_aligned_range2_256B_loop
+    jg      __cray_armci_memcpy_32B_aligned_range2_256B_loop
 
-__cray_memcpy_32B_aligned_range2_255B:
+__cray_armci_memcpy_32B_aligned_range2_255B:
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
 .align 32
-__cray_memcpy_32B_aligned_range2_32B_loop:
+__cray_armci_memcpy_32B_aligned_range2_32B_loop:
     vmovaps 0x00(%rsi), %xmm0
     vmovaps 0x10(%rsi), %xmm1
     vmovaps %xmm0, 0x00(%rdi)
@@ -368,12 +375,12 @@ __cray_memcpy_32B_aligned_range2_32B_loop:
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_32B_aligned_range2_32B_loop
+    jg      __cray_armci_memcpy_32B_aligned_range2_32B_loop
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
-    jmp     __cray_memcpy_31B
+    jmp     __cray_armci_memcpy_31B
 
 ############
 # For Range 1 [256B,2^12B],
@@ -384,8 +391,8 @@ __cray_memcpy_32B_aligned_range2_32B_loop:
 # [ ] NT stores
 ############
 .align 32
-__cray_memcpy_32B_aligned_range1_entry:
-__cray_memcpy_32B_aligned_range1_256B_loop:
+__cray_armci_memcpy_32B_aligned_range1_entry:
+__cray_armci_memcpy_32B_aligned_range1_256B_loop:
     vmovaps 0x00(%rsi), %xmm0
     vmovaps %xmm0, 0x00(%rdi)
     vmovaps 0x10(%rsi), %xmm1
@@ -427,17 +434,17 @@ __cray_memcpy_32B_aligned_range1_256B_loop:
     add     $128, %rdi
     sub     $256, %rdx
     cmp     $255, %rdx
-    jg      __cray_memcpy_32B_aligned_range1_256B_loop
+    jg      __cray_armci_memcpy_32B_aligned_range1_256B_loop
 
-__cray_memcpy_32B_aligned_range1_255B:
+__cray_armci_memcpy_32B_aligned_range1_255B:
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
 .align 32
-__cray_memcpy_32B_aligned_range1_32B_loop:
+__cray_armci_memcpy_32B_aligned_range1_32B_loop:
     vmovaps 0x00(%rsi), %xmm0
     vmovaps %xmm0, 0x00(%rdi)
     vmovaps 0x10(%rsi), %xmm1
@@ -447,25 +454,25 @@ __cray_memcpy_32B_aligned_range1_32B_loop:
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_32B_aligned_range1_32B_loop
+    jg      __cray_armci_memcpy_32B_aligned_range1_32B_loop
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*32 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*32 size
 
-    jmp     __cray_memcpy_31B
+    jmp     __cray_armci_memcpy_31B
 
 ##################################################
 ############## 16B Aligned Large Loop ############
 ##################################################
-__cray_memcpy_16B_aligned:
+__cray_armci_memcpy_16B_aligned:
     cmp     $255, %rdx
-    jle     __cray_memcpy_16B_aligned_range1_255B
+    jle     __cray_armci_memcpy_16B_aligned_range1_255B
 
     cmp     $4*1024, %rdx
-    jl      __cray_memcpy_16B_aligned_range1_entry
+    jl      __cray_armci_memcpy_16B_aligned_range1_entry
 
     cmp     $1024*1024, %rdx
-    jl      __cray_memcpy_16B_aligned_range2_entry
+    jl      __cray_armci_memcpy_16B_aligned_range2_entry
 
 ############
 # For Range 3 [2^20B,],
@@ -475,7 +482,7 @@ __cray_memcpy_16B_aligned:
 # [X] NT loads
 # [X] NT stores
 ############
-__cray_memcpy_16B_aligned_range3_entry:
+__cray_armci_memcpy_16B_aligned_range3_entry:
     prefetchnta 0x000(%rsi)
     prefetchnta 0x040(%rsi)
     prefetchnta 0x080(%rsi)
@@ -490,7 +497,7 @@ __cray_memcpy_16B_aligned_range3_entry:
     prefetchnta 0x2c0(%rsi)
 
 .align 32
-__cray_memcpy_16B_aligned_range3_256B_loop:
+__cray_armci_memcpy_16B_aligned_range3_256B_loop:
     prefetchnta 0x300(%rsi)
     prefetchnta 0x340(%rsi)
     prefetchnta 0x380(%rsi)
@@ -537,18 +544,18 @@ __cray_memcpy_16B_aligned_range3_256B_loop:
     add     $128, %rdi
     sub     $256, %rdx
     cmp     $255, %rdx
-    jg      __cray_memcpy_16B_aligned_range3_256B_loop
+    jg      __cray_armci_memcpy_16B_aligned_range3_256B_loop
 
-__cray_memcpy_16B_aligned_range3_255B:
+__cray_armci_memcpy_16B_aligned_range3_255B:
     sfence
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
-__cray_memcpy_16B_aligned_range3_32B_loop:
+__cray_armci_memcpy_16B_aligned_range3_32B_loop:
     vmovntdqa 0x00(%rsi), %xmm0
     vmovntdq %xmm0, 0x00(%rdi)
     vmovntdqa 0x10(%rsi), %xmm1
@@ -558,14 +565,14 @@ __cray_memcpy_16B_aligned_range3_32B_loop:
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_16B_aligned_range3_32B_loop
+    jg      __cray_armci_memcpy_16B_aligned_range3_32B_loop
 
     sfence
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
-    jmp     __cray_memcpy_31B
+    jmp     __cray_armci_memcpy_31B
 
 ############
 # For Range 2 [2^12B,2^20B],
@@ -575,7 +582,7 @@ __cray_memcpy_16B_aligned_range3_32B_loop:
 # [ ] NT loads
 # [ ] NT stores
 ############
-__cray_memcpy_16B_aligned_range2_entry:
+__cray_armci_memcpy_16B_aligned_range2_entry:
     prefetcht0 0x000(%rsi)
     prefetcht0 0x040(%rsi)
     prefetcht0 0x080(%rsi)
@@ -590,7 +597,7 @@ __cray_memcpy_16B_aligned_range2_entry:
     prefetcht0 0x2c0(%rsi)
 
 .align 32
-__cray_memcpy_16B_aligned_range2_256B_loop:
+__cray_armci_memcpy_16B_aligned_range2_256B_loop:
     prefetcht0 0x300(%rsi)
     prefetcht0 0x340(%rsi)
     prefetcht0 0x380(%rsi)
@@ -637,17 +644,17 @@ __cray_memcpy_16B_aligned_range2_256B_loop:
     add     $128, %rdi
     sub     $256, %rdx
     cmp     $255, %rdx
-    jg      __cray_memcpy_16B_aligned_range2_256B_loop
+    jg      __cray_armci_memcpy_16B_aligned_range2_256B_loop
 
-__cray_memcpy_16B_aligned_range2_255B:
+__cray_armci_memcpy_16B_aligned_range2_255B:
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
 .align 32
-__cray_memcpy_16B_aligned_range2_32B_loop:
+__cray_armci_memcpy_16B_aligned_range2_32B_loop:
     vmovaps 0x00(%rsi), %xmm0
     vmovaps 0x10(%rsi), %xmm1
     vmovaps %xmm0, 0x00(%rdi)
@@ -657,12 +664,12 @@ __cray_memcpy_16B_aligned_range2_32B_loop:
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_16B_aligned_range2_32B_loop
+    jg      __cray_armci_memcpy_16B_aligned_range2_32B_loop
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
-    jmp     __cray_memcpy_31B
+    jmp     __cray_armci_memcpy_31B
 
 ############
 # For Range 1 [256B,2^12B],
@@ -673,8 +680,8 @@ __cray_memcpy_16B_aligned_range2_32B_loop:
 # [ ] NT stores
 ############
 .align 32
-__cray_memcpy_16B_aligned_range1_entry:
-__cray_memcpy_16B_aligned_range1_256B_loop:
+__cray_armci_memcpy_16B_aligned_range1_entry:
+__cray_armci_memcpy_16B_aligned_range1_256B_loop:
     vmovaps 0x00(%rsi), %xmm0
     vmovaps %xmm0, 0x00(%rdi)
     vmovaps 0x10(%rsi), %xmm1
@@ -716,17 +723,17 @@ __cray_memcpy_16B_aligned_range1_256B_loop:
     add     $128, %rdi
     sub     $256, %rdx
     cmp     $255, %rdx
-    jg      __cray_memcpy_16B_aligned_range1_256B_loop
+    jg      __cray_armci_memcpy_16B_aligned_range1_256B_loop
 
-__cray_memcpy_16B_aligned_range1_255B:
+__cray_armci_memcpy_16B_aligned_range1_255B:
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
 .align 32
-__cray_memcpy_16B_aligned_range1_32B_loop:
+__cray_armci_memcpy_16B_aligned_range1_32B_loop:
     vmovaps 0x00(%rsi), %xmm0
     vmovaps %xmm0, 0x00(%rdi)
     vmovaps 0x10(%rsi), %xmm1
@@ -736,23 +743,23 @@ __cray_memcpy_16B_aligned_range1_32B_loop:
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_16B_aligned_range1_32B_loop
+    jg      __cray_armci_memcpy_16B_aligned_range1_32B_loop
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*32 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*32 size
 
-    jmp     __cray_memcpy_31B
+    jmp     __cray_armci_memcpy_31B
 
 ###################################
 ########### Unaligned #############
 ##### Peel To Aligned Stores ######
 ###################################
-__cray_memcpy_unaligned:
+__cray_armci_memcpy_unaligned:
     mov     %rdi, %r9
     neg     %r9 # Invert, add 1
-__cray_memcpy_peel_31B:
+__cray_armci_memcpy_peel_31B:
     test    $16, %r9
-    jz      __cray_memcpy_peel_15B
+    jz      __cray_armci_memcpy_peel_15B
 
     mov     0x00(%rsi), %r8
     mov     %r8, 0x00(%rdi)
@@ -762,9 +769,9 @@ __cray_memcpy_peel_31B:
     add     $16, %rdi
     sub     $16, %rdx
 
-__cray_memcpy_peel_15B:
+__cray_armci_memcpy_peel_15B:
     test    $8, %r9
-    jz      __cray_memcpy_peel_7B
+    jz      __cray_armci_memcpy_peel_7B
 
     mov     0x00(%rsi), %r8
     mov     %r8, 0x00(%rdi)
@@ -772,9 +779,9 @@ __cray_memcpy_peel_15B:
     add     $8, %rdi
     sub     $8, %rdx
 
-__cray_memcpy_peel_7B:
+__cray_armci_memcpy_peel_7B:
     test    $4, %r9
-    jz      __cray_memcpy_peel_3B
+    jz      __cray_armci_memcpy_peel_3B
 
     mov     0x00(%rsi), %r8d
     mov     %r8d, 0x00(%rdi)
@@ -782,9 +789,9 @@ __cray_memcpy_peel_7B:
     add     $4, %rdi
     sub     $4, %rdx
 
-__cray_memcpy_peel_3B:
+__cray_armci_memcpy_peel_3B:
     test    $2, %r9
-    jz      __cray_memcpy_peel_1B
+    jz      __cray_armci_memcpy_peel_1B
 
     mov     0x00(%rsi), %r8w
     mov     %r8w, 0x00(%rdi)
@@ -792,9 +799,9 @@ __cray_memcpy_peel_3B:
     add     $2, %rdi
     sub     $2, %rdx
 
-__cray_memcpy_peel_1B:
+__cray_armci_memcpy_peel_1B:
     test    $1, %r9
-    jz      __cray_memcpy_32B_aligned_st
+    jz      __cray_armci_memcpy_32B_aligned_st
 
     mov     0x00(%rsi), %r8b
     mov     %r8b, 0x00(%rdi)
@@ -805,26 +812,26 @@ __cray_memcpy_peel_1B:
 ##########################################
 ############ Store Now Aligned ###########
 ##########################################
-__cray_memcpy_32B_aligned_st:
+__cray_armci_memcpy_32B_aligned_st:
     # Test for 32B aligned loads
     test    $0x1f, %rsi
-    jz      __cray_memcpy_32B_aligned
+    jz      __cray_armci_memcpy_32B_aligned
 
     # Test for 16B aligned loads
     test    $0xf, %rsi
-    jz      __cray_memcpy_16B_aligned
+    jz      __cray_armci_memcpy_16B_aligned
 
     # Test for smaller sized moves
     cmp     $255, %rdx
-    jle     __cray_memcpy_unaligned_range1_255B
+    jle     __cray_armci_memcpy_unaligned_range1_255B
 
     cmp     $8*1024, %rdx
-    jl      __cray_memcpy_unaligned_range1_entry
+    jl      __cray_armci_memcpy_unaligned_range1_entry
 
     cmp     $4*1024*1024, %rdx
-    jl      __cray_memcpy_unaligned_range2_entry
+    jl      __cray_armci_memcpy_unaligned_range2_entry
 
-__cray_memcpy_unaligned_range3_entry:
+__cray_armci_memcpy_unaligned_range3_entry:
     prefetchnta 0x000(%rsi)
     prefetchnta 0x040(%rsi)
     prefetchnta 0x080(%rsi)
@@ -839,7 +846,7 @@ __cray_memcpy_unaligned_range3_entry:
     prefetchnta 0x2c0(%rsi)
 
 .align 32
-__cray_memcpy_unaligned_range3_256B_loop:
+__cray_armci_memcpy_unaligned_range3_256B_loop:
     prefetchnta 0x300(%rsi)
     prefetchnta 0x340(%rsi)
     prefetchnta 0x380(%rsi)
@@ -914,19 +921,19 @@ __cray_memcpy_unaligned_range3_256B_loop:
     add     $512, %rdi
     sub     $512, %rdx
     cmp     $511, %rdx
-    jg      __cray_memcpy_unaligned_range3_256B_loop
+    jg      __cray_armci_memcpy_unaligned_range3_256B_loop
 
-__cray_memcpy_unaligned_range3_255B:
+__cray_armci_memcpy_unaligned_range3_255B:
     sfence
-    
+
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
 .align 32
-__cray_memcpy_unaligned_range3_32B_loop:
+__cray_armci_memcpy_unaligned_range3_32B_loop:
     vmovups 0x00(%rsi), %xmm0
     vmovaps %xmm0, 0x00(%rdi)
     vmovups 0x10(%rsi), %xmm1
@@ -936,16 +943,16 @@ __cray_memcpy_unaligned_range3_32B_loop:
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_unaligned_range3_32B_loop
+    jg      __cray_armci_memcpy_unaligned_range3_32B_loop
 
     sfence
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*32 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*32 size
 
-    jmp     __cray_memcpy_31B
+    jmp     __cray_armci_memcpy_31B
 
-__cray_memcpy_unaligned_range2_entry:
+__cray_armci_memcpy_unaligned_range2_entry:
     prefetchnta 0x000(%rsi)
     prefetchnta 0x040(%rsi)
     prefetchnta 0x080(%rsi)
@@ -973,7 +980,7 @@ __cray_memcpy_unaligned_range2_entry:
     prefetchw 0x2c0(%rdi)
 
 .align 32
-__cray_memcpy_unaligned_range2_256B_loop:
+__cray_armci_memcpy_unaligned_range2_256B_loop:
     prefetchnta 0x300(%rsi)
     prefetchnta 0x340(%rsi)
     prefetchnta 0x380(%rsi)
@@ -1025,40 +1032,40 @@ __cray_memcpy_unaligned_range2_256B_loop:
     add     $128, %rdi
     sub     $256, %rdx
     cmp     $255, %rdx
-    jg      __cray_memcpy_unaligned_range2_256B_loop
+    jg      __cray_armci_memcpy_unaligned_range2_256B_loop
 
-__cray_memcpy_unaligned_range2_255B:
+__cray_armci_memcpy_unaligned_range2_255B:
     sfence
-    
+
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
 .align 32
-__cray_memcpy_unaligned_range2_32B_loop:
+__cray_armci_memcpy_unaligned_range2_32B_loop:
     vmovupd 0x00(%rsi), %xmm0
     vmovupd 0x10(%rsi), %xmm1
     vmovaps %xmm0, 0x00(%rdi)
     vmovaps %xmm1, 0x10(%rdi)
- 
+
     add     $32, %rsi
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_unaligned_range2_32B_loop
+    jg      __cray_armci_memcpy_unaligned_range2_32B_loop
 
     sfence
 
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret   # Fast exit for n*32 size
+    jz      __cray_armci_memcpy_ret   # Fast exit for n*32 size
 
-    jmp     __cray_memcpy_31B
+    jmp     __cray_armci_memcpy_31B
 
 .align 32
-__cray_memcpy_unaligned_range1_entry:
-__cray_memcpy_unaligned_range1_256B_loop:
+__cray_armci_memcpy_unaligned_range1_entry:
+__cray_armci_memcpy_unaligned_range1_256B_loop:
     vmovups 0x00(%rsi), %xmm0
     vmovups 0x10(%rsi), %xmm1
     vmovups 0x20(%rsi), %xmm2
@@ -1100,17 +1107,17 @@ __cray_memcpy_unaligned_range1_256B_loop:
     add     $128, %rdi
     sub     $256, %rdx
     cmp     $255, %rdx
-    jg      __cray_memcpy_unaligned_range1_256B_loop
+    jg      __cray_armci_memcpy_unaligned_range1_256B_loop
 
-__cray_memcpy_unaligned_range1_255B:
+__cray_armci_memcpy_unaligned_range1_255B:
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
+    jz      __cray_armci_memcpy_ret
 
     cmp     $31, %rdx
-    jle     __cray_memcpy_31B
+    jle     __cray_armci_memcpy_31B
 
 .align 32
-__cray_memcpy_unaligned_range1_32B_loop:
+__cray_armci_memcpy_unaligned_range1_32B_loop:
     vmovups 0x00(%rsi), %xmm0
     vmovups 0x10(%rsi), %xmm1
     vmovaps %xmm0, 0x00(%rdi)
@@ -1120,9 +1127,9 @@ __cray_memcpy_unaligned_range1_32B_loop:
     add     $32, %rdi
     sub     $32, %rdx
     cmp     $31, %rdx
-    jg      __cray_memcpy_unaligned_range1_32B_loop
-    
+    jg      __cray_armci_memcpy_unaligned_range1_32B_loop
+
     test    %rdx, %rdx
-    jz      __cray_memcpy_ret
-    
-    jmp     __cray_memcpy_31B
+    jz      __cray_armci_memcpy_ret
+
+    jmp     __cray_armci_memcpy_31B
