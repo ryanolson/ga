@@ -122,12 +122,14 @@ double FATR TCGTIME_()
     double diff;
 
     if (first_call) {
-        first_time = armci_timer();
+        /* first_time = armci_timer(); */
+        first_time = MPI_Wtime();
         first_call = 0;
         last_time  = -1e-9; 
     }
 
-    cur_time = armci_timer();
+    /* cur_time = armci_timer(); */
+    cur_time = MPI_Wtime();
     diff = cur_time - first_time;
 
     /* address crappy armci_timer: consectutive calls must be at least 1ns apart  */
