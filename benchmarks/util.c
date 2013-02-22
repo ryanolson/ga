@@ -50,7 +50,7 @@ void name(Integer *unit) \
     fflush(stdout);      \
     fflush(stderr);      \
 }
-F77_FLUSH(ffflush)
+//F77_FLUSH(ffflush)
 F77_FLUSH(ffflush_)
 F77_FLUSH(ffflush__)
 F77_FLUSH(FFFLUSH)
