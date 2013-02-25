@@ -623,11 +623,12 @@ int PARMCI_AccS(int datatype, void *scale,
         /* XPMEM optimisation */
         if (!armci_uses_shm || !ARMCI_Same_node(proc))
 #endif
+        {
             // allocate the temporary buffer
             get_buf = (char *)my_malloc(sizeof(char) * sizetogetput);
+            assert(get_buf);
+        }
     }
-
-    assert(get_buf);
 
     // grab the atomics lock
     dmapp_network_lock(proc);
