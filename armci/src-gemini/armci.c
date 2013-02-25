@@ -478,11 +478,11 @@ int PARMCI_PutS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
                 (char *)dst_ptr + dst_idx, count[0], proc);
     }
 
+    PARMCI_WaitProc(proc);
+
 #if HAVE_DMAPP_LOCK
     if(use_locks_on_put) dmapp_network_unlock(proc);
 #endif
-
-    PARMCI_WaitProc(proc);
 
     return 0;
 }
@@ -550,12 +550,12 @@ int PARMCI_GetS(void *src_ptr, int src_stride_ar[/*stride_levels*/],
                 (char *)dst_ptr + dst_idx, count[0], proc);
     }
 
+    PARMCI_WaitProc(proc);
+    
 #if HAVE_DMAPP_LOCK
     if(use_locks_on_get) dmapp_network_unlock(proc);
 #endif
 
-    PARMCI_WaitProc(proc);
-    
     return 0;
 }
 
