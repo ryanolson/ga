@@ -571,6 +571,13 @@ int PARMCI_Acc(int datatype, void *scale,
     return 0;
 }
 
+typedef struct acc_buffer {
+    char * get_buf;
+    char * src_ptr;
+    char * dst_ptr;
+    long src_idx;
+    long dst_idx;
+} acc_buffer_t;
 
 int PARMCI_AccS(int datatype, void *scale,
                 void *src_ptr, int src_stride_ar[/*stride_levels*/],
@@ -586,8 +593,12 @@ int PARMCI_AccS(int datatype, void *scale,
     int dmapp_status = DMAPP_RC_SUCCESS;
     double calc_scale = *(double *)scale;
     int sizetogetput;
-    void *get_buf;
+    char *get_buf;
     long k = 0;
+    acc_buffer_t buffers[3];
+    acc_buffer_t * get_buffer = NULL;
+    acc_buffer_t * acc_buffer = NULL;
+    acc_buffer_t * put_buffer = NULL;
 
 #if HAVE_DMAPP_LOCK
     int lock_on_get = use_locks_on_get;
@@ -625,7 +636,10 @@ int PARMCI_AccS(int datatype, void *scale,
 #endif
         {
             // allocate the temporary buffer
-            get_buf = (char *)my_malloc(sizeof(char) * sizetogetput);
+            get_buf = (char *)my_malloc(sizeof(char) * sizetogetput * 3);
+            buffers[0].get_buf = get_buf;
+            buffers[1].get_buf = &get_buf[sizetogetput];
+            buffers[2].get_buf = &get_buf[sizetogetput*2];
             assert(get_buf);
         }
     }
@@ -634,6 +648,10 @@ int PARMCI_AccS(int datatype, void *scale,
     dmapp_network_lock(proc);
 
     for(i=0; i<n1dim; i++) {
+
+        if(acc_buffer) put_buffer = acc_buffer;
+        if(get_buffer) acc_buffer = get_buffer;
+
         src_idx = 0;
         for(j=1; j<=stride_levels; j++) {
             src_idx += src_bvalue[j] * src_stride_ar[j-1];
@@ -656,6 +674,12 @@ int PARMCI_AccS(int datatype, void *scale,
                 dst_bvalue[j] = 0;
             }
         }
+
+        get_buffer = &buffers[i % 3];
+        get_buffer->src_ptr = src_ptr;
+        get_buffer->src_idx = src_idx;
+        get_buffer->dst_ptr = dst_ptr;
+        get_buffer->dst_idx = dst_idx;
 
 #if HAVE_XPMEM
         /* XPMEM optimisation */
