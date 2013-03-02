@@ -5,6 +5,8 @@
 #   include "config.h"
 #endif
 
+#define HAVE_DMAPP_QUEUE 1
+
 /* C and/or system headers */
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,6 +28,7 @@
 #include "groups.h"
 #include "parmci.h"
 #include "reg_cache.h"
+#include "message.h"
 
 #define DEBUG 0
 
@@ -41,6 +44,13 @@ static int use_locks_on_get = 0;
 static int use_locks_on_put = 0;
 #endif
 
+#if HAVE_DMAPP_QUEUE
+int armci_use_rem_acc = HAVE_DMAPP_QUEUE;
+dmapp_queue_handle_t  armci_queue_hndl;
+static uint32_t armci_dmapp_qdepth = DMAPP_QUEUE_DEFAULT_DEPTH;
+static uint32_t armci_dmapp_qnelems = DMAPP_QUEUE_DEFAULT_NELEMS;
+static uint64_t armci_dmapp_qflags = DMAPP_QUEUE_ASYNC_PROGRESS;
+#endif
 
 /* exported state */
 local_state l_state;
@@ -571,11 +581,59 @@ int PARMCI_Acc(int datatype, void *scale,
     return 0;
 }
 
+/* Perform the scaled Accumulate operation on src/dst array leaving result in dst array */
+static void
+do_acc(void *src, void *dst, int datatype, void *scale, int count)
+{
+#define EQ_ONE_REG(A) ((A) == 1.0)
+#define EQ_ONE_CPL(A) ((A).real == 1.0 && (A).imag == 0.0)
+#define IADD_REG(A,B) (A) += (B)
+#define IADD_CPL(A,B) (A).real += (B).real; (A).imag += (B).imag
+#define IADD_SCALE_REG(A,B,C) (A) += (B) * (C)
+#define IADD_SCALE_CPL(A,B,C) (A).real += ((B).real*(C).real) - ((B).imag*(C).imag);\
+                              (A).imag += ((B).real*(C).imag) + ((B).imag*(C).real);
+#define ACC(WHICH, ARMCI_TYPE, C_TYPE)                                      \
+        if (datatype == ARMCI_TYPE) {                                       \
+            int m;                                                          \
+            int m_lim = count/sizeof(C_TYPE);                               \
+            C_TYPE *iterator = (C_TYPE *)dst;                               \
+            C_TYPE *value = (C_TYPE *)src;                                  \
+            C_TYPE calc_scale = *(C_TYPE *)scale;                           \
+            if (EQ_ONE_##WHICH(calc_scale)) {                               \
+                for (m = 0 ; m < m_lim; ++m) {                              \
+                    IADD_##WHICH(iterator[m], value[m]);                    \
+                }                                                           \
+            }                                                               \
+            else {                                                          \
+                for (m = 0 ; m < m_lim; ++m) {                              \
+                    IADD_SCALE_##WHICH(iterator[m], value[m], calc_scale);  \
+                }                                                           \
+            }                                                               \
+        } else
+        ACC(REG, ARMCI_ACC_DBL, double)
+        ACC(REG, ARMCI_ACC_FLT, float)
+        ACC(REG, ARMCI_ACC_INT, int)
+        ACC(REG, ARMCI_ACC_LNG, long)
+        ACC(CPL, ARMCI_ACC_DCP, DoubleComplex)
+        ACC(CPL, ARMCI_ACC_CPL, SingleComplex)
+        {
+            assert(0);
+        }
+#undef ACC
+#undef EQ_ONE_REG
+#undef EQ_ONE_CPL
+#undef IADD_REG
+#undef IADD_CPL
+#undef IADD_SCALE_REG
+#undef IADD_SCALE_CPL
 
-int PARMCI_AccS(int datatype, void *scale,
-                void *src_ptr, int src_stride_ar[/*stride_levels*/],
-                void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
-                int count[/*stride_levels+1*/], int stride_levels, int proc)
+        return;
+}
+
+static int do_AccS(int datatype, void *scale,
+                   void *src_ptr, int src_stride_ar[/*stride_levels*/],
+                   void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
+                   int count[/*stride_levels+1*/], int stride_levels, int proc)
 {
     int i, j;
     long src_idx, dst_idx;  /* index offset of current block position to ptr */
@@ -584,9 +642,8 @@ int PARMCI_AccS(int datatype, void *scale,
     int dst_bvalue[7], dst_bunit[7];
     MPI_Status status;
     int dmapp_status = DMAPP_RC_SUCCESS;
-    double calc_scale = *(double *)scale;
     int sizetogetput;
-    void *get_buf;
+    void *get_buf = NULL;
     long k = 0;
 
 #if HAVE_DMAPP_LOCK
@@ -630,7 +687,7 @@ int PARMCI_AccS(int datatype, void *scale,
         }
     }
 
-    // grab the atomics lock
+    // grab the atomic lock
     dmapp_network_lock(proc);
 
     for(i=0; i<n1dim; i++) {
@@ -675,59 +732,19 @@ int PARMCI_AccS(int datatype, void *scale,
         }
         else
 #endif
-            // Get the remote data in a temp buffer
+            // Get the remote data in to a temp buffer
             PARMCI_Get((char *)dst_ptr + dst_idx, get_buf, sizetogetput, proc);
 
-#define EQ_ONE_REG(A) ((A) == 1.0)
-#define EQ_ONE_CPL(A) ((A).real == 1.0 && (A).imag == 0.0)
-#define IADD_REG(A,B) (A) += (B)
-#define IADD_CPL(A,B) (A).real += (B).real; (A).imag += (B).imag
-#define IADD_SCALE_REG(A,B,C) (A) += (B) * (C)
-#define IADD_SCALE_CPL(A,B,C) (A).real += ((B).real*(C).real) - ((B).imag*(C).imag);\
-                              (A).imag += ((B).real*(C).imag) + ((B).imag*(C).real);
-#define ACC(WHICH, ARMCI_TYPE, C_TYPE)                                      \
-        if (datatype == ARMCI_TYPE) {                                       \
-            int m;                                                          \
-            int m_lim = count[0]/sizeof(C_TYPE);                            \
-            C_TYPE *iterator = (C_TYPE *)get_buf;                           \
-            C_TYPE *value = (C_TYPE *)((char *)src_ptr + src_idx);          \
-            C_TYPE calc_scale = *(C_TYPE *)scale;                           \
-            if (EQ_ONE_##WHICH(calc_scale)) {                               \
-                for (m = 0 ; m < m_lim; ++m) {                              \
-                    IADD_##WHICH(iterator[m], value[m]);                    \
-                }                                                           \
-            }                                                               \
-            else {                                                          \
-                for (m = 0 ; m < m_lim; ++m) {                              \
-                    IADD_SCALE_##WHICH(iterator[m], value[m], calc_scale);  \
-                }                                                           \
-            }                                                               \
-        } else
-        ACC(REG, ARMCI_ACC_DBL, double)
-        ACC(REG, ARMCI_ACC_FLT, float)
-        ACC(REG, ARMCI_ACC_INT, int)
-        ACC(REG, ARMCI_ACC_LNG, long)
-        ACC(CPL, ARMCI_ACC_DCP, DoubleComplex)
-        ACC(CPL, ARMCI_ACC_CPL, SingleComplex)
-        {
-            assert(0);
-        }
-#undef ACC
-#undef EQ_ONE_REG
-#undef EQ_ONE_CPL
-#undef IADD_REG
-#undef IADD_CPL
-#undef IADD_SCALE_REG
-#undef IADD_SCALE_CPL
+        /* Now perform the Accumulate operation leaving the result in get_buf */
+        do_acc((char *)src_ptr + src_idx, get_buf, datatype, scale, sizetogetput);
 
 #if HAVE_XPMEM
     /* XPMEM optimisation */
     if (!armci_uses_shm || !ARMCI_Same_node(proc))
 #endif
-        // Write back
+        // Write back result
         PARMCI_Put(get_buf, (char *)dst_ptr + dst_idx, sizetogetput, proc);
     }
-    PARMCI_WaitProc(proc);
 
     // ungrab the lock
     dmapp_network_unlock(proc);
@@ -742,10 +759,253 @@ int PARMCI_AccS(int datatype, void *scale,
     if (!armci_uses_shm || !ARMCI_Same_node(proc))
 #endif
         // free temp buffer
-        if (sizetogetput > l_state.acc_buf_len)
+        if (get_buf && sizetogetput > l_state.acc_buf_len)
             my_free(get_buf);
 
     return 0;
+}
+
+
+#if HAVE_DMAPP_QUEUE
+static int do_remote_AccS(int datatype, void *scale,
+                         void *src_ptr, int src_stride_ar[/*stride_levels*/],
+                         void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
+                         int count[/*stride_levels+1*/], int stride_levels, int proc)
+{
+    int i, j;
+    long src_idx, dst_idx;  /* index offset of current block position to ptr */
+    int n1dim;  /* number of 1 dim block */
+    int src_bvalue[7], src_bunit[7];
+    int dst_bvalue[7], dst_bunit[7];
+    int dmapp_status = DMAPP_RC_SUCCESS;
+    int sizetoget;
+    void *get_buf = NULL;
+    long k = 0;
+
+    /* number of n-element of the first dimension */
+    n1dim = 1;
+    for(i=1; i<=stride_levels; i++)
+        n1dim *= count[i];
+
+    /* calculate the destination indices */
+    src_bvalue[0] = 0; src_bvalue[1] = 0; src_bunit[0] = 1; src_bunit[1] = 1;
+    dst_bvalue[0] = 0; dst_bvalue[1] = 0; dst_bunit[0] = 1; dst_bunit[1] = 1;
+
+    for(i=2; i<=stride_levels; i++)
+    {
+        src_bvalue[i] = 0;
+        dst_bvalue[i] = 0;
+        src_bunit[i] = src_bunit[i-1] * count[i-1];
+        dst_bunit[i] = dst_bunit[i-1] * count[i-1];
+    }
+
+    sizetoget = count[0];
+
+    if (sizetoget <= l_state.acc_buf_len) {
+        get_buf = l_state.acc_buf;
+    }
+    else {
+            // allocate the temporary buffer
+            get_buf = (char *)my_malloc(sizeof(char) * sizetoget);
+            assert(get_buf);
+    }
+
+    // grab the atomic lock
+    dmapp_network_lock(proc);
+
+    for(i=0; i<n1dim; i++) {
+        src_idx = 0;
+        for(j=1; j<=stride_levels; j++) {
+            src_idx += src_bvalue[j] * src_stride_ar[j-1];
+            if((i+1) % src_bunit[j] == 0) {
+                src_bvalue[j]++;
+            }
+            if(src_bvalue[j] > (count[j]-1)) {
+                src_bvalue[j] = 0;
+            }
+        }
+
+        dst_idx = 0;
+
+        for(j=1; j<=stride_levels; j++) {
+            dst_idx += dst_bvalue[j] * dst_stride_ar[j-1];
+            if((i+1) % dst_bunit[j] == 0) {
+                dst_bvalue[j]++;
+            }
+            if(dst_bvalue[j] > (count[j]-1)) {
+                dst_bvalue[j] = 0;
+            }
+        }
+
+        // Get the remote data in to a temp buffer
+        PARMCI_Get((char *)src_ptr + src_idx, get_buf, sizetoget, proc);
+
+        /* Now perform the Accumulate operation leaving the result in dst buf */
+        do_acc(get_buf, (char *)dst_ptr + dst_idx, datatype, scale, sizetoget);
+    }
+
+    // ungrab the lock
+    dmapp_network_unlock(proc);
+
+    // Notify source that request has completed
+    parmci_notify(proc);
+
+    // free temp buffer
+    if (get_buf && sizetoget > l_state.acc_buf_len)
+        my_free(get_buf);
+
+    return 0;
+}
+
+static int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
+{
+    void *src_ptr; int *src_stride_ar;
+    void *dst_ptr; int *dst_stride_ar;
+    int *count;
+    int datatype; void *scale;
+    int stride_levels;
+    int slen;
+
+    /* Unpack the remote AccS request */
+    src_ptr = *(void **)msg;
+    msg += sizeof(void*);
+    dst_ptr = *(void **)msg;
+    msg += sizeof(void*);
+    stride_levels = *(int*)msg;
+    msg += sizeof(int);
+    src_stride_ar = (int *)msg;
+    msg += sizeof(int)*stride_levels;
+    dst_stride_ar = (int *)msg;
+    msg += sizeof(int)*stride_levels;
+    count = (int*)msg;
+    msg += sizeof(int)*(stride_levels+1);
+    datatype = *(int *)msg;
+    msg += sizeof(int);
+    scale = msg;
+    /* get scale len */
+    switch(datatype){
+    case ARMCI_ACC_INT: slen = sizeof(int); break;
+    case ARMCI_ACC_DCP: slen = 2*sizeof(double); break;
+    case ARMCI_ACC_DBL: slen = sizeof(double); break;
+    case ARMCI_ACC_CPL: slen = 2*sizeof(float); break;
+    case ARMCI_ACC_FLT: slen = sizeof(float); break;
+    case ARMCI_ACC_LNG: slen = sizeof(long); break;
+    default: slen=0;
+    }
+    msg += slen;
+
+    return do_remote_AccS(datatype, scale,
+                          src_ptr, src_stride_ar,
+                          dst_ptr, dst_stride_ar,
+                          count, stride_levels, proc);
+}
+
+static int armci_queue_cb(void *context, void *data, uint32_t len, dmapp_pe_t rank)
+{
+    return process_remote_AccS(data, len, rank);
+}
+
+static int send_remote_AccS(int datatype, void *scale,
+                            void *src_ptr, int src_stride_ar[/*stride_levels*/],
+                            void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
+                            int count[/*stride_levels+1*/], int stride_levels, int proc)
+{
+    int i, bytes, hdrsize, slen, nelems, wait;
+    char *msg, *buf;
+    dmapp_return_t status;
+
+    for(i=0, bytes=1; i<=stride_levels;i++) bytes*=count[i];
+
+    hdrsize = (2*sizeof(void*) /* src_ptr + dst-ptr */ +
+               2*sizeof(int)  /* stride_levels + datatype */ +
+               2*sizeof(int)*stride_levels /* src_stride_ar[] + dst_stride_ar[] */ +
+               sizeof(int)*(stride_levels+1) /* count[] */ +
+               2*sizeof(double)); /* scale */
+
+    buf = msg = malloc(hdrsize);
+    assert(msg);
+
+    /* Pack AccS request into msg */
+    *(void **)msg = src_ptr;
+    msg += sizeof(void*);
+    *(void **)msg = dst_ptr;
+    msg += sizeof(void*);
+    *(int*)msg = stride_levels;
+    msg += sizeof(int);
+    for (i = 0; i < stride_levels; i++) {
+        ((int *)msg)[i] = src_stride_ar[i];
+    }
+    msg += sizeof(int)*stride_levels;
+    for (i = 0; i < stride_levels; i++) {
+        ((int *)msg)[i] = dst_stride_ar[i];
+    }
+    msg += sizeof(int)*stride_levels;
+    for (i = 0; i < stride_levels+1; i++) {
+        ((int*)msg)[i] = count[i];
+    }
+    msg += sizeof(int)*(stride_levels+1);
+    *(int *)msg = datatype;
+    msg += sizeof(int);
+    scale = msg;
+    /* pack scale */
+    switch(datatype){
+    case ARMCI_ACC_INT:
+        *(int*)msg = *(int*)scale; slen= sizeof(int); break;
+    case ARMCI_ACC_DCP:
+        ((double*)msg)[0] = ((double*)scale)[0];
+        ((double*)msg)[1] = ((double*)scale)[1];
+        slen=2*sizeof(double);break;
+    case ARMCI_ACC_DBL:
+        *(double*)msg = *(double*)scale; slen = sizeof(double); break;
+    case ARMCI_ACC_CPL:
+        ((float*)msg)[0] = ((float*)scale)[0];
+        ((float*)msg)[1] = ((float*)scale)[1];
+        slen=2*sizeof(float);break;
+    case ARMCI_ACC_FLT:
+        *(float*)msg = *(float*)scale; slen = sizeof(float); break;
+    default: slen=0;
+    }
+    msg += slen;
+
+    /* Calculate message length in whole QWs */
+    nelems = ((msg + sizeof(long)-1) - buf)/sizeof(long);
+    assert(nelems <= armci_dmapp_qnelems-1);
+
+    status = dmapp_queue_put(armci_queue_hndl, buf, nelems, DMAPP_QW, proc, 0);
+    if (status != DMAPP_RC_SUCCESS) {
+        fprintf(stderr,"\n dmapp_queue_put FAILED: %d\n", status);
+        assert(0);
+    }
+
+    /* Wait for completion of Remote accumulate */
+    parmci_notify_wait(proc, &wait);
+
+    return 0;
+}
+
+#endif /* HAVE_DMAPP_QUEUE */
+
+int PARMCI_AccS(int datatype, void *scale,
+                void *src_ptr, int src_stride_ar[/*stride_levels*/],
+                void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
+                int count[/*stride_levels+1*/], int stride_levels, int proc)
+{
+#if HAVE_XPMEM
+        /* XPMEM optimisation */
+        if (armci_uses_shm && ARMCI_Same_node(proc))
+            return do_AccS(datatype, scale, src_ptr, src_stride_ar,
+                           dst_ptr, dst_stride_ar, count , stride_levels, proc);
+        else
+#endif
+#if HAVE_DMAPP_QUEUE
+            /* DMAPP Queue based Remote accumulate */
+            if (armci_use_rem_acc)
+                return send_remote_AccS(datatype, scale, src_ptr, src_stride_ar,
+                                        dst_ptr, dst_stride_ar, count , stride_levels, proc);
+            else
+#endif
+                return do_AccS(datatype, scale, src_ptr, src_stride_ar,
+                               dst_ptr, dst_stride_ar, count , stride_levels, proc);
 }
 
 
@@ -1010,6 +1270,18 @@ static void create_dmapp_locks(void)
     MPI_Barrier(l_state.world_comm);
 }
 
+#if HAVE_DMAPP_QUEUE
+static void create_dmapp_queue(void)
+{
+    dmapp_return_t status;
+
+    status = dmapp_queue_attach(armci_queue_cb, 0, 0, &armci_queue_hndl);
+    if (status != DMAPP_RC_SUCCESS) {
+        fprintf(stderr,"\n dmapp_queue_attach FAILED: %d\n", status);
+        assert(0);
+    }
+}
+#endif
 
 static void dmapp_alloc_buf(void)
 {
@@ -1059,7 +1331,7 @@ void cpu_yield()
 #elif defined(WIN32)
                Sleep(1);
 #elif defined(_POSIX_PRIORITY_SCHEDULING)
-               sched_yield();
+//               sched_yield();
 #else
                usleep(1);
 #endif
@@ -1135,6 +1407,11 @@ int PARMCI_Init()
     // Create locks
     create_dmapp_locks();
 
+#if HAVE_DMAPP_QUEUE
+    // Create DMAPP queue
+    create_dmapp_queue();
+#endif
+
     armci_notify_init();
 
     /* mutexes */
@@ -1153,6 +1430,8 @@ int PARMCI_Init()
         printf("malloc_is_using_huge_pages=%d\n", malloc_is_using_huge_pages);
         printf("XPMEM use is %s\n", (armci_uses_shm) ? "ENABLED" : "DISABLED");
         printf("Optimized CPU memcpy is %s\n", (!armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
+        printf("armci_use_rem_acc is %s\n", (armci_use_rem_acc) ? "ENABLED" : "DISABLED");
+        printf("use acc thread is %s\n", (armci_dmapp_qflags & DMAPP_QUEUE_ASYNC_PROGRESS) ? "ENABLED" : "DISABLED");
     }
 #endif
 
@@ -1434,6 +1713,10 @@ int parmci_notify_wait(int proc,int *pval)
      while( pnotify->waited > pnotify->received) {
          if(++loop == 1000) { loop=0;cpu_yield(); }
          armci_util_spin(loop, pnotify);
+#if HAVE_DMAPP_QUEUE
+         if (!(armci_dmapp_qflags & DMAPP_QUEUE_ASYNC_PROGRESS))
+             dmapp_progress();
+#endif
      }
      *pval = pnotify->waited;
      retval=pnotify->received;
@@ -1953,6 +2236,28 @@ static void check_envs(void)
     }
 #endif
 
+#if HAVE_DMAPP_QUEUE
+    /* DMAPP Queue API support */
+    if ((value = getenv("ARMCI_USE_REM_ACC")) != NULL) {
+        if (0 == strncasecmp(value, "y", 1)) {
+            armci_use_rem_acc = 1;
+        }
+        else if (0 == strncasecmp(value, "n", 1)) {
+            armci_use_rem_acc = 0;
+        }
+    }
+
+    if ((value = getenv("ARMCI_USE_ACC_THREAD")) != NULL) {
+        if (0 == strncasecmp(value, "y", 1)) {
+            armci_dmapp_qflags |= DMAPP_QUEUE_ASYNC_PROGRESS;
+        }
+        else if (0 == strncasecmp(value, "n", 1)) {
+            armci_dmapp_qflags &= ~DMAPP_QUEUE_ASYNC_PROGRESS;
+        }
+    }
+
+#endif
+
 }
 
 
@@ -2043,7 +2348,14 @@ static void dmapp_initialize(void)
      * - DMAPP_PI_ORDERING_RELAXED  Relaxed PI ordering (P_PASS_PW=1, NP_PASS_PW=1) */
     requested_attrs.PI_ordering = DMAPP_PI_ORDERING_RELAXED;
 
-    // initialize    
+#if HAVE_DMAPP_QUEUE
+    /* Modify RMA attributes to match our needs */
+    requested_attrs.queue_depth = armci_dmapp_qdepth;
+    requested_attrs.queue_nelems = armci_dmapp_qnelems;
+    requested_attrs.queue_flags = armci_dmapp_qflags;
+#endif
+
+    // initialize
     status = dmapp_init_ext(&requested_attrs, &actual_attrs);
     assert(status == DMAPP_RC_SUCCESS);
 #define sanity(field) assert(actual_attrs.field == requested_attrs.field)
