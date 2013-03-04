@@ -575,6 +575,7 @@ typedef struct acc_buffer {
     char * get_buf;
     long src_idx;
     long dst_idx;
+    long bytes;
 } acc_buffer_t;
 
 int PARMCI_AccS(int datatype, void *scale,
@@ -593,6 +594,7 @@ int PARMCI_AccS(int datatype, void *scale,
     int sizetogetput;
     char *get_buf;
     long k = 0;
+    int buffered_1d = 0;
     acc_buffer_t buffers[3];
     acc_buffer_t * get_buffer = NULL;
     acc_buffer_t * acc_buffer = NULL;
@@ -608,7 +610,7 @@ int PARMCI_AccS(int datatype, void *scale,
 #define ACC(WHICH, ARMCI_TYPE, C_TYPE)                                      \
         if (datatype == ARMCI_TYPE) {                                       \
             int m;                                                          \
-            int m_lim = count[0]/sizeof(C_TYPE);                            \
+            int m_lim = acc_buffer->bytes/sizeof(C_TYPE);                            \
             C_TYPE *iterator = (C_TYPE *)acc_buffer->get_buf;                           \
             C_TYPE *value = (C_TYPE *)((char *)src_ptr + acc_buffer->src_idx);          \
             C_TYPE calc_scale = *(C_TYPE *)scale;                           \
@@ -671,6 +673,15 @@ int PARMCI_AccS(int datatype, void *scale,
         }
     }
 
+
+#define CHUNK_SIZE_1D 65536
+    if(n1dim == 1 && sizetogetput > CHUNK_SIZE_1D) {
+       n1dim = sizetogetput / CHUNK_SIZE_1D;
+       if(sizetogetput % CHUNK_SIZE_1D) n1dim++;
+       sizetogetput = CHUNK_SIZE_1D;
+       buffered_1d = 1;
+    }
+
     // grab the atomics lock
     dmapp_network_lock(proc);
 
@@ -691,7 +702,6 @@ int PARMCI_AccS(int datatype, void *scale,
         }
 
         dst_idx = 0;
-
         for(j=1; j<=stride_levels; j++) {
             dst_idx += dst_bvalue[j] * dst_stride_ar[j-1];
             if((i+1) % dst_bunit[j] == 0) {
@@ -701,10 +711,17 @@ int PARMCI_AccS(int datatype, void *scale,
                 dst_bvalue[j] = 0;
             }
         }
+   
+        if(buffered_1d == 1) {
+           dst_idx = src_idx = i*CHUNK_SIZE_1D;
+           // on last iteration resize sizetogetput 
+           if(i+1 == n1dim) sizetogetput = count[0] - i*CHUNK_SIZE_1D;
+        }
 
         get_buffer = &buffers[i % 3];
         get_buffer->src_idx = src_idx;
         get_buffer->dst_idx = dst_idx;
+        get_buffer->bytes = sizetogetput;
 
 #if HAVE_XPMEM
         /* XPMEM optimisation */
@@ -716,7 +733,7 @@ int PARMCI_AccS(int datatype, void *scale,
 
             if (l_state.rank != proc) {
                 /* Find the dest memory region mapping */
-                dst_reg = reg_cache_find(proc, get_buffer->get_buf, sizetogetput);
+                dst_reg = reg_cache_find(proc, get_buffer->get_buf, get_buffer->bytes);
                 assert(dst_reg);
                 offset = (unsigned long) get_buffer->get_buf - (unsigned long)dst_reg->mr.seg.addr;
                 get_buffer->get_buf = (void *) ((unsigned long)dst_reg->mr.vaddr + offset);
@@ -726,7 +743,7 @@ int PARMCI_AccS(int datatype, void *scale,
 #endif
         {
             // Get the remote data in a temp buffer
-            PARMCI_Get_nbi((char *)dst_ptr + get_buffer->dst_idx, get_buffer->get_buf, sizetogetput, proc);
+            PARMCI_Get_nbi((char *)dst_ptr + get_buffer->dst_idx, get_buffer->get_buf, get_buffer->bytes, proc);
         }
 
         if(put_buffer) {
@@ -735,7 +752,7 @@ int PARMCI_AccS(int datatype, void *scale,
            if (!armci_uses_shm || !ARMCI_Same_node(proc))
 #endif
               // Write back to remote source
-              PARMCI_Put_nbi(put_buffer->get_buf, (char *)dst_ptr + put_buffer->dst_idx, sizetogetput, proc);
+              PARMCI_Put_nbi(put_buffer->get_buf, (char *)dst_ptr + put_buffer->dst_idx, put_buffer->bytes, proc);
         }
 
         if(acc_buffer) {
