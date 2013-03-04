@@ -1951,6 +1951,13 @@ static void check_envs(void)
           fflush(stdout);
        }
     }
+    if(getenv("ARMCI_EXTERNAL_LOCKING")) {
+       use_external_locks = atoi(getenv("ARMCI_EXTERNAL_LOCKING"));
+       if(0 == l_state.rank) {
+          fprintf(stdout,"ARMCI_EXTERNAL_LOCKING = %d\n",use_external_locks);
+          fflush(stdout);
+       }
+    }
 #endif
 
 #if HAVE_LIBHUGETLBFS
