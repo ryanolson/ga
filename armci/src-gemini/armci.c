@@ -39,8 +39,12 @@ static dmapp_lock_desc_t   lock_desc[ARMCI_MAX_LOCKS];
 static dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS];
 static int use_locks_on_get = 0;
 static int use_locks_on_put = 0;
+static int use_external_locks = 0;
 #endif
 
+#ifndef unlikely
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#endif
 
 /* exported state */
 local_state l_state;
@@ -367,10 +371,34 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     return status;
 }
 
+static void armci_lock(int proc, int lock_id)
+{
+#if HAVE_DMAPP_LOCK
+    int dmapp_status;
+    if(unlikely(lock_id < 0) || unlikely(lock_id >= ARMCI_MAX_LOCKS)) 
+       ARMCI_Error("Runtime Error: armci_lock lock_id out of range\n",911);
+    dmapp_lock_acquire( &lock_desc[lock_id], &(l_state.job.data_seg), proc, 0, &lock_handle[lock_id]);
+#else
+#error armci_lock requires HAVE_DMAPP_LOCK
+#endif
+}
+
+static void armci_unlock(int proc, int lock_id)
+{
+#if HAVE_DMAPP_LOCK
+    int dmapp_status;
+    if(unlikely(lock_id < 0) || unlikely(lock_id >= ARMCI_MAX_LOCKS)) 
+       ARMCI_Error("Runtime Error: armci_lock lock_id out of range\n",911);
+    dmapp_lock_release( lock_handle[lock_id], 0);
+#else
+#error armci_lock requires HAVE_DMAPP_LOCK
+#endif
+}
 
 static void dmapp_network_lock(int proc)
 {
     int dmapp_status;
+    if(use_external_locks) return;
 
 #if HAVE_DMAPP_LOCK
     dmapp_lock_acquire( &lock_desc[0], &(l_state.job.data_seg), proc, 0, &lock_handle[0]);
@@ -396,6 +424,7 @@ static void dmapp_network_lock(int proc)
 static void dmapp_network_unlock(int proc)
 {
     int dmapp_status;
+    if(use_external_locks) return;
 
 # if HAVE_DMAPP_LOCK
     dmapp_lock_release( lock_handle[0], 0 );
