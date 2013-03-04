@@ -1072,7 +1072,8 @@ static void dmapp_alloc_buf(void)
 {
     // FAILURE_BUFSIZE should be some multiple of our page size?
     //l_state.acc_buf_len = FAILURE_BUFSIZE;
-    l_state.acc_buf_len = armci_page_size;
+#define MAX(a,b) ( (a) > (b) ? (a) : (b) )
+    l_state.acc_buf_len = MAX((armci_page_size), (8*1024*1024));
     l_state.acc_buf = PARMCI_Malloc_local( l_state.acc_buf_len);
     assert(l_state.acc_buf);
 
@@ -1085,6 +1086,7 @@ static void dmapp_alloc_buf(void)
     l_state.get_buf_len = armci_page_size;
     l_state.get_buf = PARMCI_Malloc_local(l_state.get_buf_len);
     assert(l_state.get_buf);
+#undef MAX
 }
 
 
