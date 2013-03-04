@@ -371,27 +371,27 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     return status;
 }
 
-static void armci_lock(int proc, int lock_id)
+void PARMCI_Lock(int mutex, int proc)
 {
 #if HAVE_DMAPP_LOCK
     int dmapp_status;
-    if(unlikely(lock_id < 0) || unlikely(lock_id >= ARMCI_MAX_LOCKS)) 
-       ARMCI_Error("Runtime Error: armci_lock lock_id out of range\n",911);
-    dmapp_lock_acquire( &lock_desc[lock_id], &(l_state.job.data_seg), proc, 0, &lock_handle[lock_id]);
+    if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS)) 
+       ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
+    dmapp_lock_acquire( &lock_desc[mutex], &(l_state.job.data_seg), proc, 0, &lock_handle[mutex]);
 #else
-#error armci_lock requires HAVE_DMAPP_LOCK
+#error ARMCI_Lock requires HAVE_DMAPP_LOCK
 #endif
 }
 
-static void armci_unlock(int proc, int lock_id)
+void PARMCI_Unlock(int mutex, int proc)
 {
 #if HAVE_DMAPP_LOCK
     int dmapp_status;
-    if(unlikely(lock_id < 0) || unlikely(lock_id >= ARMCI_MAX_LOCKS)) 
-       ARMCI_Error("Runtime Error: armci_lock lock_id out of range\n",911);
-    dmapp_lock_release( lock_handle[lock_id], 0);
+    if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS)) 
+       ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
+    dmapp_lock_release( lock_handle[mutex], 0);
 #else
-#error armci_lock requires HAVE_DMAPP_LOCK
+#error ARMCI_Unlock requires HAVE_DMAPP_LOCK
 #endif
 }
 
@@ -1670,6 +1670,7 @@ int PARMCI_Destroy_mutexes()
 }
 
 
+#if 0
 void PARMCI_Lock(int mutex, int proc)
 {
     int dmapp_status;
@@ -1715,7 +1716,7 @@ void PARMCI_Unlock(int mutex, int proc)
     }
     while (*(l_state.local_mutex) != l_state.rank + 1);
 }
-
+#endif
 
 void ARMCI_Set_shm_limit(unsigned long shmemlimit)
 {
