@@ -705,10 +705,16 @@ int PARMCI_AccS(int datatype, void *scale,
 
 #define CHUNK_SIZE_1D 65536
     if(n1dim == 1 && sizetogetput > CHUNK_SIZE_1D) {
-       n1dim = sizetogetput / CHUNK_SIZE_1D;
-       if(sizetogetput % CHUNK_SIZE_1D) n1dim++;
-       sizetogetput = CHUNK_SIZE_1D;
-       buffered_1d = 1;
+#if HAVE_XPMEM
+       /* XPMEM optimisation */
+       if (!armci_uses_shm || !ARMCI_Same_node(proc))
+#endif
+       {
+           n1dim = sizetogetput / CHUNK_SIZE_1D;
+           if(sizetogetput % CHUNK_SIZE_1D) n1dim++;
+           sizetogetput = CHUNK_SIZE_1D;
+           buffered_1d = 1;
+       }
     }
 
     // grab the atomics lock
