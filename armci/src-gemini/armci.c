@@ -1565,6 +1565,7 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
     int status;
     if (op == ARMCI_FETCH_AND_ADD) {
         /* Gemini dmapp doesn't have atomic fadd for int */
+        assert(0);
         int tmp;
         dmapp_network_lock(proc);
         PARMCI_Get(prem, ploc, sizeof(int), proc);
