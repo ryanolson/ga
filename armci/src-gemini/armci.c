@@ -45,7 +45,8 @@ static int use_locks_on_put = 0;
 #endif
 
 #if HAVE_DMAPP_QUEUE
-int armci_use_rem_acc = HAVE_DMAPP_QUEUE;
+static int armci_use_rem_acc = HAVE_DMAPP_QUEUE;
+static long armci_rem_acc_threshold = 128*1024;
 dmapp_queue_handle_t  armci_queue_hndl;
 static uint32_t armci_dmapp_qdepth = DMAPP_QUEUE_DEFAULT_DEPTH;
 static uint32_t armci_dmapp_qnelems = DMAPP_QUEUE_DEFAULT_NELEMS;
@@ -768,9 +769,10 @@ static int do_AccS(int datatype, void *scale,
 
 #if HAVE_DMAPP_QUEUE
 static int do_remote_AccS(int datatype, void *scale,
-                         void *src_ptr, int src_stride_ar[/*stride_levels*/],
-                         void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
-                         int count[/*stride_levels+1*/], int stride_levels, int proc)
+                          void *src_ptr, int src_stride_ar[/*stride_levels*/],
+                          dmapp_seg_desc_t *src_seg,
+                          void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
+                          int count[/*stride_levels+1*/], int stride_levels, int proc)
 {
     int i, j;
     long src_idx, dst_idx;  /* index offset of current block position to ptr */
@@ -781,6 +783,7 @@ static int do_remote_AccS(int datatype, void *scale,
     int sizetoget;
     void *get_buf = NULL;
     long k = 0;
+    dmapp_return_t status;
 
     /* number of n-element of the first dimension */
     n1dim = 1;
@@ -838,7 +841,9 @@ static int do_remote_AccS(int datatype, void *scale,
         }
 
         // Get the remote data in to a temp buffer
-        PARMCI_Get((char *)src_ptr + src_idx, get_buf, sizetoget, proc);
+        //PARMCI_Get((char *)src_ptr + src_idx, get_buf, sizetoget, proc);
+        status = dmapp_get(get_buf, (char *)src_ptr + src_idx, src_seg, proc, sizetoget/sizeof(long), DMAPP_QW);
+        assert(status == DMAPP_RC_SUCCESS);
 
         /* Now perform the Accumulate operation leaving the result in dst buf */
         do_acc(get_buf, (char *)dst_ptr + dst_idx, datatype, scale, sizetoget);
@@ -861,6 +866,7 @@ static int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
 {
     void *src_ptr; int *src_stride_ar;
     void *dst_ptr; int *dst_stride_ar;
+    dmapp_seg_desc_t src_seg;
     int *count;
     int datatype; void *scale;
     int stride_levels;
@@ -869,6 +875,8 @@ static int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     /* Unpack the remote AccS request */
     src_ptr = *(void **)msg;
     msg += sizeof(void*);
+    src_seg = *(dmapp_seg_desc_t *)msg;
+    msg += sizeof(dmapp_seg_desc_t);
     dst_ptr = *(void **)msg;
     msg += sizeof(void*);
     stride_levels = *(int*)msg;
@@ -896,6 +904,7 @@ static int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
 
     return do_remote_AccS(datatype, scale,
                           src_ptr, src_stride_ar,
+                          &src_seg,
                           dst_ptr, dst_stride_ar,
                           count, stride_levels, proc);
 }
@@ -913,10 +922,15 @@ static int send_remote_AccS(int datatype, void *scale,
     int i, bytes, hdrsize, slen, nelems, wait;
     char *msg, *buf;
     dmapp_return_t status;
+    reg_entry_t *src_reg = NULL;
 
     for(i=0, bytes=1; i<=stride_levels;i++) bytes*=count[i];
 
+    src_reg = reg_cache_find(l_state.rank, src_ptr, bytes);
+    assert(src_reg);
+
     hdrsize = (2*sizeof(void*) /* src_ptr + dst-ptr */ +
+               sizeof(dmapp_seg_desc_t) /* src seg desc */ +
                2*sizeof(int)  /* stride_levels + datatype */ +
                2*sizeof(int)*stride_levels /* src_stride_ar[] + dst_stride_ar[] */ +
                sizeof(int)*(stride_levels+1) /* count[] */ +
@@ -928,6 +942,8 @@ static int send_remote_AccS(int datatype, void *scale,
     /* Pack AccS request into msg */
     *(void **)msg = src_ptr;
     msg += sizeof(void*);
+    *(dmapp_seg_desc_t *)msg = src_reg->mr.seg;
+    msg += sizeof(dmapp_seg_desc_t);
     *(void **)msg = dst_ptr;
     msg += sizeof(void*);
     *(int*)msg = stride_levels;
@@ -999,7 +1015,7 @@ int PARMCI_AccS(int datatype, void *scale,
 #endif
 #if HAVE_DMAPP_QUEUE
             /* DMAPP Queue based Remote accumulate */
-            if (armci_use_rem_acc)
+            if (armci_use_rem_acc && count[0] >= armci_rem_acc_threshold)
                 return send_remote_AccS(datatype, scale, src_ptr, src_stride_ar,
                                         dst_ptr, dst_stride_ar, count , stride_levels, proc);
             else
