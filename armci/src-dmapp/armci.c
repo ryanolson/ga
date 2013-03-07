@@ -39,8 +39,12 @@ static dmapp_lock_desc_t   lock_desc[ARMCI_MAX_LOCKS];
 static dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS];
 static int use_locks_on_get = 0;
 static int use_locks_on_put = 0;
+static int use_external_locks = 0;
 #endif
 
+#ifndef unlikely
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#endif
 
 /* exported state */
 local_state l_state;
@@ -367,10 +371,34 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
     return status;
 }
 
+void PARMCI_Lock(int mutex, int proc)
+{
+#if HAVE_DMAPP_LOCK
+    int dmapp_status;
+    if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS)) 
+       ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
+    dmapp_lock_acquire( &lock_desc[mutex], &(l_state.job.data_seg), proc, 0, &lock_handle[mutex]);
+#else
+#error ARMCI_Lock requires HAVE_DMAPP_LOCK
+#endif
+}
+
+void PARMCI_Unlock(int mutex, int proc)
+{
+#if HAVE_DMAPP_LOCK
+    int dmapp_status;
+    if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS)) 
+       ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
+    dmapp_lock_release( lock_handle[mutex], 0);
+#else
+#error ARMCI_Unlock requires HAVE_DMAPP_LOCK
+#endif
+}
 
 static void dmapp_network_lock(int proc)
 {
     int dmapp_status;
+    if(use_external_locks) return;
 
 #if HAVE_DMAPP_LOCK
     dmapp_lock_acquire( &lock_desc[0], &(l_state.job.data_seg), proc, 0, &lock_handle[0]);
@@ -396,6 +424,7 @@ static void dmapp_network_lock(int proc)
 static void dmapp_network_unlock(int proc)
 {
     int dmapp_status;
+    if(use_external_locks) return;
 
 # if HAVE_DMAPP_LOCK
     dmapp_lock_release( lock_handle[0], 0 );
@@ -676,10 +705,16 @@ int PARMCI_AccS(int datatype, void *scale,
 
 #define CHUNK_SIZE_1D 65536
     if(n1dim == 1 && sizetogetput > CHUNK_SIZE_1D) {
-       n1dim = sizetogetput / CHUNK_SIZE_1D;
-       if(sizetogetput % CHUNK_SIZE_1D) n1dim++;
-       sizetogetput = CHUNK_SIZE_1D;
-       buffered_1d = 1;
+#if HAVE_XPMEM
+       /* XPMEM optimisation */
+       if (!armci_uses_shm || !ARMCI_Same_node(proc))
+#endif
+       {
+           n1dim = sizetogetput / CHUNK_SIZE_1D;
+           if(sizetogetput % CHUNK_SIZE_1D) n1dim++;
+           sizetogetput = CHUNK_SIZE_1D;
+           buffered_1d = 1;
+       }
     }
 
     // grab the atomics lock
@@ -1530,6 +1565,7 @@ int  PARMCI_Rmw(int op, void *ploc, void *prem, int extra, int proc)
     int status;
     if (op == ARMCI_FETCH_AND_ADD) {
         /* Gemini dmapp doesn't have atomic fadd for int */
+        assert(0);
         int tmp;
         dmapp_network_lock(proc);
         PARMCI_Get(prem, ploc, sizeof(int), proc);
@@ -1641,6 +1677,7 @@ int PARMCI_Destroy_mutexes()
 }
 
 
+#if 0
 void PARMCI_Lock(int mutex, int proc)
 {
     int dmapp_status;
@@ -1686,7 +1723,7 @@ void PARMCI_Unlock(int mutex, int proc)
     }
     while (*(l_state.local_mutex) != l_state.rank + 1);
 }
-
+#endif
 
 void ARMCI_Set_shm_limit(unsigned long shmemlimit)
 {
@@ -1925,6 +1962,13 @@ static void check_envs(void)
        use_locks_on_put = atoi(getenv("ARMCI_DMAPP_LOCK_ON_PUT"));
        if(0 == l_state.rank) {
           fprintf(stdout,"ARMCI_DMAPP_LOCK_ON_PUT = %d\n",use_locks_on_put);
+          fflush(stdout);
+       }
+    }
+    if(getenv("ARMCI_EXTERNAL_LOCKING")) {
+       use_external_locks = atoi(getenv("ARMCI_EXTERNAL_LOCKING"));
+       if(0 == l_state.rank) {
+          fprintf(stdout,"ARMCI_EXTERNAL_LOCKING = %d\n",use_external_locks);
           fflush(stdout);
        }
     }

@@ -2184,6 +2184,8 @@ int main(int argc, char *argv[])
   ARMCI_AllFence();
   ARMCI_Barrier();
 
+/*
+  not supported for 64-bit gemini or aries networks
   if (me == 0) {
     printf("\nTesting atomic fetch&add\n");
     printf("(Std Output for all processes is printed)\n\n");
@@ -2193,7 +2195,7 @@ int main(int argc, char *argv[])
   ARMCI_Barrier();
 
   test_fetch_add();
-
+*/
   if (me == 0) {
     printf("\nTesting atomic fetch&add long\n");
     printf("(Std Output for all processes is printed)\n\n");

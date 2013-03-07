@@ -19,9 +19,6 @@
 #include "message.h"
 
 int me, nproc;
-extern void armcill_lock(int, int);
-extern void armcill_unlock(int, int);
-
 
 void test_lock()
 {
@@ -32,8 +29,8 @@ void test_lock()
   for (mut = 0; mut < 16; mut++)
     for (i = 0; i < nproc; i++) {
 #if FIXME_THESE_ARE_NOT_DEFINED_FOR_PORTALS
-      armcill_lock(mut, i);
-      armcill_unlock(mut, i);
+      ARMCI_Lock(mut, i);
+      ARMCI_Unlock(mut, i);
 #endif
       ARMCI_Barrier();
       if (me == 0) {
