@@ -1161,8 +1161,8 @@ armci/libarmcii.la:
 if ARMCI_SRC_DIR_PORTALS
 AM_CPPFLAGS += -I$(top_srcdir)/armci/src-portals
 endif
-if ARMCI_SRC_DIR_GEMINI
-AM_CPPFLAGS += -I$(top_srcdir)/armci/src-gemini
+if ARMCI_SRC_DIR_DMAPP
+AM_CPPFLAGS += -I$(top_srcdir)/armci/src-dmapp
 endif
 if ARMCI_SRC_DIR_OPENIB
 AM_CPPFLAGS += -I$(top_srcdir)/armci/src-openib

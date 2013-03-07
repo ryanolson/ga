@@ -238,11 +238,11 @@ AS_IF([test "x$happy" = xyes],
     [$2])
 ])dnl
 
-# _GA_ARMCI_NETWORK_GEMINI([ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
+# _GA_ARMCI_NETWORK_DMAPP([ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
 # ------------------------------------------------------------------
-# TODO when gemini headers and libraries become available, fix this
-AC_DEFUN([_GA_ARMCI_NETWORK_GEMINI], [
-AC_MSG_NOTICE([searching for GEMINI...])
+# TODO when dmapp headers and libraries become available, fix this
+AC_DEFUN([_GA_ARMCI_NETWORK_DMAPP], [
+AC_MSG_NOTICE([searching for DMAPP...])
 happy=yes
 AS_IF([test "x$happy" = xyes],
     [AC_CHECK_HEADER([dmapp.h], [], [happy=no])])
@@ -281,7 +281,7 @@ AS_IF([test "x$happy" = xyes],
         [AC_DEFINE([HAVE_XPMEM], [0],
                [Define to 1 if you have the `xpmem' library.])])])
 AS_IF([test "x$happy" = xyes],
-    [ga_armci_network=GEMINI; with_gemini=yes; $1],
+    [ga_armci_network=DMAPP; with_dmapp=yes; $1],
     [$2])
 ])dnl
 
@@ -309,7 +309,7 @@ _GA_ARMCI_NETWORK_WITH([mpi-mt],    [MPI-2 multi-threading])
 _GA_ARMCI_NETWORK_WITH([mpi-spawn], [MPI-2 dynamic process mgmt])
 _GA_ARMCI_NETWORK_WITH([openib],    [Infiniband OpenIB])
 _GA_ARMCI_NETWORK_WITH([portals],   [Cray XT portals])
-_GA_ARMCI_NETWORK_WITH([gemini],    [Cray XE Gemini])
+_GA_ARMCI_NETWORK_WITH([dmapp],     [Cray XE/XC DMAPP])
 _GA_ARMCI_NETWORK_WITH([sockets],   [Ethernet TCP/IP])
 # Temporarily add ARMCI_NETWORK_CPPFLAGS to CPPFLAGS.
 ga_save_CPPFLAGS="$CPPFLAGS"; CPPFLAGS="$CPPFLAGS $ARMCI_NETWORK_CPPFLAGS"
@@ -337,8 +337,8 @@ dnl         [_GA_ARMCI_NETWORK_MPI_SPAWN()])
         [_GA_ARMCI_NETWORK_OPENIB()])
      AS_IF([test "x$ga_armci_network" = x && test "x$with_portals" != xno],
         [_GA_ARMCI_NETWORK_PORTALS()])
-     AS_IF([test "x$ga_armci_network" = x && test "x$with_gemini" != xno],
-        [_GA_ARMCI_NETWORK_GEMINI()])
+     AS_IF([test "x$ga_armci_network" = x && test "x$with_dmapp" != xno],
+        [_GA_ARMCI_NETWORK_DMAPP()])
      AS_IF([test "x$ga_armci_network" = x],
         [AC_MSG_WARN([!!!])
          AC_MSG_WARN([No ARMCI_NETWORK detected, defaulting to SOCKETS])
@@ -376,9 +376,9 @@ dnl         [_GA_ARMCI_NETWORK_MPI_SPAWN()])
               AS_IF([test "x$ga_armci_network" = xPORTALS],
                  [_GA_ARMCI_NETWORK_PORTALS([],
                     [AC_MSG_ERROR([test for ARMCI_NETWORK=PORTALS failed])])])
-              AS_IF([test "x$ga_armci_network" = xGEMINI],
-                 [_GA_ARMCI_NETWORK_GEMINI([],
-                    [AC_MSG_ERROR([test for ARMCI_NETWORK=GEMINI failed])])])
+              AS_IF([test "x$ga_armci_network" = xDMAPP],
+                 [_GA_ARMCI_NETWORK_DMAPP([],
+                    [AC_MSG_ERROR([test for ARMCI_NETWORK=DMAPP failed])])])
              ],
         [AC_MSG_WARN([too many armci networks specified: $armci_network_count])
          AC_MSG_WARN([the following were specified:])
@@ -391,7 +391,7 @@ dnl         [_GA_ARMCI_NETWORK_MPI_SPAWN()])
          _GA_ARMCI_NETWORK_WARN([mpi-spawn])
          _GA_ARMCI_NETWORK_WARN([openib])
          _GA_ARMCI_NETWORK_WARN([portals])
-         _GA_ARMCI_NETWORK_WARN([gemini])
+         _GA_ARMCI_NETWORK_WARN([dmapp])
          _GA_ARMCI_NETWORK_WARN([sockets])
          AC_MSG_ERROR([please select only one armci network])])])
 # Remove ARMCI_NETWORK_CPPFLAGS from CPPFLAGS.
@@ -408,7 +408,7 @@ _GA_ARMCI_NETWORK_AM_CONDITIONAL([mpi-ts])
 _GA_ARMCI_NETWORK_AM_CONDITIONAL([mpi-mt])
 _GA_ARMCI_NETWORK_AM_CONDITIONAL([mpi-spawn])
 _GA_ARMCI_NETWORK_AM_CONDITIONAL([openib])
-_GA_ARMCI_NETWORK_AM_CONDITIONAL([gemini])
+_GA_ARMCI_NETWORK_AM_CONDITIONAL([dmapp])
 _GA_ARMCI_NETWORK_AM_CONDITIONAL([portals])
 _GA_ARMCI_NETWORK_AM_CONDITIONAL([sockets])
 AC_SUBST([ARMCI_NETWORK_LDFLAGS])
@@ -424,13 +424,13 @@ AM_CONDITIONAL([DCMF_VER_0_3], [test x = x]) # always true
 AS_CASE([$ga_armci_network],
 [OPENIB],   [ARMCI_SRC_DIR=src-openib],
 [PORTALS],  [ARMCI_SRC_DIR=src-portals],
-[GEMINI],   [ARMCI_SRC_DIR=src-gemini],
+[DMAPP],   [ARMCI_SRC_DIR=src-dmapp],
 [MPI_TS],   [ARMCI_SRC_DIR=src-mpi],
             [ARMCI_SRC_DIR=src])
 AC_SUBST([ARMCI_SRC_DIR])
 AM_CONDITIONAL([ARMCI_SRC_DIR_OPENIB],  [test "x$ARMCI_SRC_DIR" = "xsrc-openib"])
 AM_CONDITIONAL([ARMCI_SRC_DIR_PORTALS], [test "x$ARMCI_SRC_DIR" = "xsrc-portals"])
-AM_CONDITIONAL([ARMCI_SRC_DIR_GEMINI],  [test "x$ARMCI_SRC_DIR" = "xsrc-gemini"])
+AM_CONDITIONAL([ARMCI_SRC_DIR_DMAPP],  [test "x$ARMCI_SRC_DIR" = "xsrc-dmapp"])
 AM_CONDITIONAL([ARMCI_SRC_DIR_MPI],     [test "x$ARMCI_SRC_DIR" = "xsrc-mpi"])
 AM_CONDITIONAL([ARMCI_SRC_DIR_SRC],     [test "x$ARMCI_SRC_DIR" = "xsrc"])
 
@@ -451,7 +451,7 @@ ga_cv_sysv_hack=no
 AS_IF([test "x$ARMCI_TOP_BUILDDIR" != x], [
     AS_IF([test x$ga_cv_sysv = xno],
         [AS_CASE([$ga_armci_network],
-            [BGML|DCMF|PORTALS|GEMINI], [ga_cv_sysv_hack=no],
+            [BGML|DCMF|PORTALS|DMAPP], [ga_cv_sysv_hack=no],
                 [ga_cv_sysv_hack=yes])],
         [ga_cv_sysv_hack=yes])
 AS_IF([test x$ga_cv_sysv_hack = xyes],

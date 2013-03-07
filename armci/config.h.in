@@ -54,7 +54,7 @@
 /* Define to 1 on Cray T3E systems */
 #undef CRAY_T3E
 
-/* for Gemini */
+/* for Cray XE/XC */
 #undef CRAY_UGNI
 
 /* TODO */
@@ -77,6 +77,9 @@
 
 /* Define to 1 on DEC OSF */
 #undef DECOSF
+
+/* for Cray XE/XC */
+#undef DMAPP
 
 /* TODO */
 #undef DOELAN4
@@ -133,9 +136,6 @@
 
 /* Module command when using Fortran 90 compiler e.g. use f90_unix */
 #undef FXX_MODULE
-
-/* for Gemini */
-#undef GEMINI
 
 /* TODO */
 #undef GM
@@ -458,7 +458,7 @@
 /* TODO */
 #undef LAPI_RDMA
 
-/* for Gemini */
+/* for Cray XE/XC */
 #undef LIBONESIDED
 
 /* Define to 1 on generic Linux systems */

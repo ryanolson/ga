@@ -256,7 +256,7 @@ check_PROGRAMS = ma/testc$(EXEEXT) ma/test-coalesce$(EXEEXT) \
 @CXX_BINDINGS_TRUE@	ga++/testing/testc ga++/testing/testmult
 @ENABLE_F77_TRUE@am__append_35 = gparrays/testing/test
 @ARMCI_SRC_DIR_PORTALS_TRUE@am__append_36 = -I$(top_srcdir)/armci/src-portals
-@ARMCI_SRC_DIR_GEMINI_TRUE@am__append_37 = -I$(top_srcdir)/armci/src-gemini
+@ARMCI_SRC_DIR_DMAPP_TRUE@am__append_37 = -I$(top_srcdir)/armci/src-dmapp
 @ARMCI_SRC_DIR_OPENIB_TRUE@am__append_38 = -I$(top_srcdir)/armci/src-openib
 @ARMCI_SRC_DIR_MPI_TRUE@am__append_39 = -I$(top_srcdir)/armci/src-mpi
 @ARMCI_SRC_DIR_SRC_TRUE@am__append_40 = -I$(top_srcdir)/armci/src/include

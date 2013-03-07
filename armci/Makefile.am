@@ -164,10 +164,10 @@ include $(top_srcdir)/src-portals/Makefile.inc
 endif
 
 ##############################################################################
-# src-gemini
+# src-dmapp
 #
-if ARMCI_SRC_DIR_GEMINI
-include $(top_srcdir)/src-gemini/Makefile.inc
+if ARMCI_SRC_DIR_DMAPP
+include $(top_srcdir)/src-dmapp/Makefile.inc
 endif
 
 ##############################################################################
