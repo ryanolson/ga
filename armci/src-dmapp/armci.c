@@ -571,6 +571,12 @@ int PARMCI_Acc(int datatype, void *scale,
     return 0;
 }
 
+typedef struct acc_buffer {
+    char * get_buf;
+    long src_idx;
+    long dst_idx;
+    long bytes;
+} acc_buffer_t;
 
 int PARMCI_AccS(int datatype, void *scale,
                 void *src_ptr, int src_stride_ar[/*stride_levels*/],
@@ -586,8 +592,39 @@ int PARMCI_AccS(int datatype, void *scale,
     int dmapp_status = DMAPP_RC_SUCCESS;
     double calc_scale = *(double *)scale;
     int sizetogetput;
-    void *get_buf;
+    char *get_buf;
     long k = 0;
+    int buffered_1d = 0;
+    acc_buffer_t buffers[3];
+    acc_buffer_t * get_buffer = NULL;
+    acc_buffer_t * acc_buffer = NULL;
+    acc_buffer_t * put_buffer = NULL;
+
+#define EQ_ONE_REG(A) ((A) == 1.0)
+#define EQ_ONE_CPL(A) ((A).real == 1.0 && (A).imag == 0.0)
+#define IADD_REG(A,B) (A) += (B)
+#define IADD_CPL(A,B) (A).real += (B).real; (A).imag += (B).imag
+#define IADD_SCALE_REG(A,B,C) (A) += (B) * (C)
+#define IADD_SCALE_CPL(A,B,C) (A).real += ((B).real*(C).real) - ((B).imag*(C).imag);\
+                              (A).imag += ((B).real*(C).imag) + ((B).imag*(C).real);
+#define ACC(WHICH, ARMCI_TYPE, C_TYPE)                                      \
+        if (datatype == ARMCI_TYPE) {                                       \
+            int m;                                                          \
+            int m_lim = acc_buffer->bytes/sizeof(C_TYPE);                            \
+            C_TYPE *iterator = (C_TYPE *)acc_buffer->get_buf;                           \
+            C_TYPE *value = (C_TYPE *)((char *)src_ptr + acc_buffer->src_idx);          \
+            C_TYPE calc_scale = *(C_TYPE *)scale;                           \
+            if (EQ_ONE_##WHICH(calc_scale)) {                               \
+                for (m = 0 ; m < m_lim; ++m) {                              \
+                    IADD_##WHICH(iterator[m], value[m]);                    \
+                }                                                           \
+            }                                                               \
+            else {                                                          \
+                for (m = 0 ; m < m_lim; ++m) {                              \
+                    IADD_SCALE_##WHICH(iterator[m], value[m], calc_scale);  \
+                }                                                           \
+            }                                                               \
+        } else
 
 #if HAVE_DMAPP_LOCK
     int lock_on_get = use_locks_on_get;
@@ -615,8 +652,11 @@ int PARMCI_AccS(int datatype, void *scale,
 
     sizetogetput = count[0];
 
-    if (sizetogetput <= l_state.acc_buf_len) {
+    if (sizetogetput*3 <= l_state.acc_buf_len) {
         get_buf = l_state.acc_buf;
+        buffers[0].get_buf = get_buf;
+        buffers[1].get_buf = &get_buf[sizetogetput];
+        buffers[2].get_buf = &get_buf[sizetogetput*2];
     }
     else {
 #if HAVE_XPMEM
@@ -625,15 +665,31 @@ int PARMCI_AccS(int datatype, void *scale,
 #endif
         {
             // allocate the temporary buffer
-            get_buf = (char *)my_malloc(sizeof(char) * sizetogetput);
+            get_buf = (char *)my_malloc(sizeof(char) * sizetogetput * 3);
+            buffers[0].get_buf = get_buf;
+            buffers[1].get_buf = &get_buf[sizetogetput];
+            buffers[2].get_buf = &get_buf[sizetogetput*2];
             assert(get_buf);
         }
+    }
+
+
+#define CHUNK_SIZE_1D 65536
+    if(n1dim == 1 && sizetogetput > CHUNK_SIZE_1D) {
+       n1dim = sizetogetput / CHUNK_SIZE_1D;
+       if(sizetogetput % CHUNK_SIZE_1D) n1dim++;
+       sizetogetput = CHUNK_SIZE_1D;
+       buffered_1d = 1;
     }
 
     // grab the atomics lock
     dmapp_network_lock(proc);
 
     for(i=0; i<n1dim; i++) {
+
+        if(acc_buffer) put_buffer = acc_buffer;
+        if(get_buffer) acc_buffer = get_buffer;
+
         src_idx = 0;
         for(j=1; j<=stride_levels; j++) {
             src_idx += src_bvalue[j] * src_stride_ar[j-1];
@@ -646,7 +702,6 @@ int PARMCI_AccS(int datatype, void *scale,
         }
 
         dst_idx = 0;
-
         for(j=1; j<=stride_levels; j++) {
             dst_idx += dst_bvalue[j] * dst_stride_ar[j-1];
             if((i+1) % dst_bunit[j] == 0) {
@@ -656,6 +711,17 @@ int PARMCI_AccS(int datatype, void *scale,
                 dst_bvalue[j] = 0;
             }
         }
+   
+        if(buffered_1d == 1) {
+           dst_idx = src_idx = i*CHUNK_SIZE_1D;
+           // on last iteration resize sizetogetput 
+           if(i+1 == n1dim) sizetogetput = count[0] - i*CHUNK_SIZE_1D;
+        }
+
+        get_buffer = &buffers[i % 3];
+        get_buffer->src_idx = src_idx;
+        get_buffer->dst_idx = dst_idx;
+        get_buffer->bytes = sizetogetput;
 
 #if HAVE_XPMEM
         /* XPMEM optimisation */
@@ -663,71 +729,72 @@ int PARMCI_AccS(int datatype, void *scale,
             reg_entry_t *dst_reg;
             unsigned long offset;
 
-            get_buf = (char *)dst_ptr + dst_idx;
+            get_buffer->get_buf = (char *)dst_ptr + get_buffer->dst_idx;
 
             if (l_state.rank != proc) {
                 /* Find the dest memory region mapping */
-                dst_reg = reg_cache_find(proc, get_buf, sizetogetput);
+                dst_reg = reg_cache_find(proc, get_buffer->get_buf, get_buffer->bytes);
                 assert(dst_reg);
-                offset = (unsigned long) get_buf - (unsigned long)dst_reg->mr.seg.addr;
-                get_buf = (void *) ((unsigned long)dst_reg->mr.vaddr + offset);
+                offset = (unsigned long) get_buffer->get_buf - (unsigned long)dst_reg->mr.seg.addr;
+                get_buffer->get_buf = (void *) ((unsigned long)dst_reg->mr.vaddr + offset);
             }
         }
         else
 #endif
-            // Get the remote data in a temp buffer
-            PARMCI_Get((char *)dst_ptr + dst_idx, get_buf, sizetogetput, proc);
-
-#define EQ_ONE_REG(A) ((A) == 1.0)
-#define EQ_ONE_CPL(A) ((A).real == 1.0 && (A).imag == 0.0)
-#define IADD_REG(A,B) (A) += (B)
-#define IADD_CPL(A,B) (A).real += (B).real; (A).imag += (B).imag
-#define IADD_SCALE_REG(A,B,C) (A) += (B) * (C)
-#define IADD_SCALE_CPL(A,B,C) (A).real += ((B).real*(C).real) - ((B).imag*(C).imag);\
-                              (A).imag += ((B).real*(C).imag) + ((B).imag*(C).real);
-#define ACC(WHICH, ARMCI_TYPE, C_TYPE)                                      \
-        if (datatype == ARMCI_TYPE) {                                       \
-            int m;                                                          \
-            int m_lim = count[0]/sizeof(C_TYPE);                            \
-            C_TYPE *iterator = (C_TYPE *)get_buf;                           \
-            C_TYPE *value = (C_TYPE *)((char *)src_ptr + src_idx);          \
-            C_TYPE calc_scale = *(C_TYPE *)scale;                           \
-            if (EQ_ONE_##WHICH(calc_scale)) {                               \
-                for (m = 0 ; m < m_lim; ++m) {                              \
-                    IADD_##WHICH(iterator[m], value[m]);                    \
-                }                                                           \
-            }                                                               \
-            else {                                                          \
-                for (m = 0 ; m < m_lim; ++m) {                              \
-                    IADD_SCALE_##WHICH(iterator[m], value[m], calc_scale);  \
-                }                                                           \
-            }                                                               \
-        } else
-        ACC(REG, ARMCI_ACC_DBL, double)
-        ACC(REG, ARMCI_ACC_FLT, float)
-        ACC(REG, ARMCI_ACC_INT, int)
-        ACC(REG, ARMCI_ACC_LNG, long)
-        ACC(CPL, ARMCI_ACC_DCP, DoubleComplex)
-        ACC(CPL, ARMCI_ACC_CPL, SingleComplex)
         {
-            assert(0);
+            // Get the remote data in a temp buffer
+            PARMCI_Get_nbi((char *)dst_ptr + get_buffer->dst_idx, get_buffer->get_buf, get_buffer->bytes, proc);
         }
-#undef ACC
-#undef EQ_ONE_REG
-#undef EQ_ONE_CPL
-#undef IADD_REG
-#undef IADD_CPL
-#undef IADD_SCALE_REG
-#undef IADD_SCALE_CPL
 
+        if(put_buffer) {
 #if HAVE_XPMEM
-    /* XPMEM optimisation */
-    if (!armci_uses_shm || !ARMCI_Same_node(proc))
+           /* XPMEM optimisation */
+           if (!armci_uses_shm || !ARMCI_Same_node(proc))
 #endif
-        // Write back
-        PARMCI_Put(get_buf, (char *)dst_ptr + dst_idx, sizetogetput, proc);
+              // Write back to remote source
+              PARMCI_Put_nbi(put_buffer->get_buf, (char *)dst_ptr + put_buffer->dst_idx, put_buffer->bytes, proc);
+        }
+
+        if(acc_buffer) {
+           ACC(REG, ARMCI_ACC_DBL, double)
+           ACC(REG, ARMCI_ACC_FLT, float)
+           ACC(REG, ARMCI_ACC_INT, int)
+           ACC(REG, ARMCI_ACC_LNG, long)
+           ACC(CPL, ARMCI_ACC_DCP, DoubleComplex)
+           ACC(CPL, ARMCI_ACC_CPL, SingleComplex)
+           {
+               assert(0);
+           }
+        }
+
+        PARMCI_WaitProc(proc);
     }
-    PARMCI_WaitProc(proc);
+
+    // Clean up remaining get and acc buffers
+    while(get_buffer || acc_buffer) {
+       if(acc_buffer) put_buffer = acc_buffer;  acc_buffer = NULL;
+       if(get_buffer) acc_buffer = get_buffer;  get_buffer = NULL;
+       if(put_buffer) {
+#if HAVE_XPMEM
+           /* XPMEM optimisation */
+           if (!armci_uses_shm || !ARMCI_Same_node(proc))
+#endif
+              // Write back to remote source
+              PARMCI_Put_nbi(put_buffer->get_buf, (char *)dst_ptr + put_buffer->dst_idx, sizetogetput, proc);
+       }
+       if(acc_buffer) {
+           ACC(REG, ARMCI_ACC_DBL, double)
+           ACC(REG, ARMCI_ACC_FLT, float)
+           ACC(REG, ARMCI_ACC_INT, int)
+           ACC(REG, ARMCI_ACC_LNG, long)
+           ACC(CPL, ARMCI_ACC_DCP, DoubleComplex)
+           ACC(CPL, ARMCI_ACC_CPL, SingleComplex)
+           {
+               assert(0);
+           }
+       }
+       PARMCI_WaitProc(proc);
+    }
 
     // ungrab the lock
     dmapp_network_unlock(proc);
@@ -745,6 +812,13 @@ int PARMCI_AccS(int datatype, void *scale,
         if (sizetogetput > l_state.acc_buf_len)
             my_free(get_buf);
 
+#undef ACC
+#undef EQ_ONE_REG
+#undef EQ_ONE_CPL
+#undef IADD_REG
+#undef IADD_CPL
+#undef IADD_SCALE_REG
+#undef IADD_SCALE_CPL
     return 0;
 }
 
@@ -1015,7 +1089,8 @@ static void dmapp_alloc_buf(void)
 {
     // FAILURE_BUFSIZE should be some multiple of our page size?
     //l_state.acc_buf_len = FAILURE_BUFSIZE;
-    l_state.acc_buf_len = armci_page_size;
+#define MAX(a,b) ( (a) > (b) ? (a) : (b) )
+    l_state.acc_buf_len = MAX((armci_page_size), (8*1024*1024));
     l_state.acc_buf = PARMCI_Malloc_local( l_state.acc_buf_len);
     assert(l_state.acc_buf);
 
@@ -1028,6 +1103,7 @@ static void dmapp_alloc_buf(void)
     l_state.get_buf_len = armci_page_size;
     l_state.get_buf = PARMCI_Malloc_local(l_state.get_buf_len);
     assert(l_state.get_buf);
+#undef MAX
 }
 
 
