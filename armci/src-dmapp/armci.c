@@ -926,6 +926,11 @@ static int send_remote_AccS(int datatype, void *scale,
 
     for(i=0, bytes=1; i<=stride_levels;i++) bytes*=count[i];
 
+#if 0
+    printf("Send Rem AccS: count %d bytes %d strides %d to proc %d\n",
+           count[0], bytes, stride_levels, proc);
+#endif
+
     src_reg = reg_cache_find(l_state.rank, src_ptr, bytes);
     assert(src_reg);
 
@@ -1448,6 +1453,7 @@ int PARMCI_Init()
         printf("Optimized CPU memcpy is %s\n", (!armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
         printf("armci_use_rem_acc is %s\n", (armci_use_rem_acc) ? "ENABLED" : "DISABLED");
         printf("use acc thread is %s\n", (armci_dmapp_qflags & DMAPP_QUEUE_ASYNC_PROGRESS) ? "ENABLED" : "DISABLED");
+        printf("remote acc threshold %d\n", armci_rem_acc_threshold);
     }
 #endif
 
@@ -2279,6 +2285,9 @@ static void check_envs(void)
         }
     }
 
+    if ((value = getenv("ARMCI_REM_ACC_THRESHOLD")) != NULL) {
+        armci_rem_acc_threshold = atoi(value);
+    }
 #endif
 
 }
