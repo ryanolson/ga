@@ -1820,14 +1820,21 @@ static void check_envs(void)
 {
     char *value;
 
-    /* PARMCI_GEMINI_DMAPP_ROUTING
+    /* ARMCI_DMAPP_[PUT|GET]_ROUTING
      *
      * TODO description */
-    if ((value = getenv("PARMCI_GEMINI_DMAPP_ROUTING")) != NULL){
-        l_state.dmapp_routing = (atoi(value));
+    if ((value = getenv("ARMCI_DMAPP_PUT_ROUTING")) != NULL){
+        l_state.dmapp_put_routing = (atoi(value));
     }
     else {
-        l_state.dmapp_routing = DMAPP_ROUTING_ADAPTIVE;
+        l_state.dmapp_put_routing = DMAPP_ROUTING_ADAPTIVE;
+    }
+
+    if ((value = getenv("ARMCI_DMAPP_GET_ROUTING")) != NULL){
+        l_state.dmapp_get_routing = (atoi(value));
+    }
+    else {
+        l_state.dmapp_get_routing = DMAPP_ROUTING_ADAPTIVE;
     }
 
 #if HAVE_DMAPP_LOCK
@@ -2004,7 +2011,7 @@ static void dmapp_initialize(void)
      * - DMAPP_ROUTING_IN_ORDER
      * - DMAPP_ROUTING_DETERMINISTIC
      * - DMAPP_ROUTING_ADAPTIVE */
-    requested_attrs.put_relaxed_ordering = l_state.dmapp_routing;
+    requested_attrs.put_relaxed_ordering = l_state.dmapp_put_routing;
 
     /* Specifies the type of routing to be used. Applies to RMA requests with
      * GET semantics. The default is DMAPP_ROUTING_ADAPTIVE. The value can be
@@ -2013,7 +2020,7 @@ static void dmapp_initialize(void)
      * - DMAPP_ROUTING_IN_ORDER
      * - DMAPP_ROUTING_DETERMINISTIC
      * - DMAPP_ROUTING_ADAPTIVE */
-    requested_attrs.get_relaxed_ordering = l_state.dmapp_routing;
+    requested_attrs.get_relaxed_ordering = l_state.dmapp_get_routing;
 
     /* The maximum number of threads that can access DMAPP. You can only use
      * this when thread-safety is enabled. The default is 1. You can only

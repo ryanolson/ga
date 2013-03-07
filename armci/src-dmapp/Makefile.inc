@@ -1,15 +1,15 @@
-libarmci_la_SOURCES += src-gemini/armci.c
-libarmci_la_SOURCES += src-gemini/armci_impl.h
-libarmci_la_SOURCES += src-gemini/clusterinfo.c
-libarmci_la_SOURCES += src-gemini/cray_memcpy_intel.s
-libarmci_la_SOURCES += src-gemini/cray_memcpy_amd.s
-libarmci_la_SOURCES += src-gemini/groups.c
-libarmci_la_SOURCES += src-gemini/groups.h
-libarmci_la_SOURCES += src-gemini/message.c
-libarmci_la_SOURCES += src-gemini/reg_cache.c
-libarmci_la_SOURCES += src-gemini/reg_cache.h
+libarmci_la_SOURCES += src-dmapp/armci.c
+libarmci_la_SOURCES += src-dmapp/armci_impl.h
+libarmci_la_SOURCES += src-dmapp/clusterinfo.c
+libarmci_la_SOURCES += src-dmapp/cray_memcpy_intel.s
+libarmci_la_SOURCES += src-dmapp/cray_memcpy_amd.s
+libarmci_la_SOURCES += src-dmapp/groups.c
+libarmci_la_SOURCES += src-dmapp/groups.h
+libarmci_la_SOURCES += src-dmapp/message.c
+libarmci_la_SOURCES += src-dmapp/reg_cache.c
+libarmci_la_SOURCES += src-dmapp/reg_cache.h
 
-AM_CPPFLAGS += -I$(top_srcdir)/src-gemini
+AM_CPPFLAGS += -I$(top_srcdir)/src-dmapp
 
-include_HEADERS += src-gemini/armci.h
-include_HEADERS += src-gemini/message.h
+include_HEADERS += src-dmapp/armci.h
+include_HEADERS += src-dmapp/message.h

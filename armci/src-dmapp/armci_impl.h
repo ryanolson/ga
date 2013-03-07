@@ -68,8 +68,9 @@ typedef struct {
     void *get_buf;
     int get_buf_len;
 
-    /* envs */ 
-    int dmapp_routing;
+    /* envs */
+    int dmapp_put_routing;
+    int dmapp_get_routing;
 } local_state;
 
 extern local_state l_state;
