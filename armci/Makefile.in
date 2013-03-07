@@ -94,7 +94,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__include_HEADERS_DIST) \
 	$(srcdir)/config.h.in $(top_srcdir)/configure \
 	$(top_srcdir)/gaf2c/farg.h.in \
 	$(top_srcdir)/gaf2c/typesf2c.h.in \
-	$(top_srcdir)/src-gemini/Makefile.inc \
+	$(top_srcdir)/src-dmapp/Makefile.inc \
 	$(top_srcdir)/src-mpi/Makefile.inc \
 	$(top_srcdir)/src-openib/Makefile.inc \
 	$(top_srcdir)/src-portals/Makefile.inc \
@@ -315,19 +315,19 @@ DIST_COMMON = README $(am__configure_deps) $(am__include_HEADERS_DIST) \
 @ARMCI_SRC_DIR_PORTALS_TRUE@	src-portals/message.h
 @ARMCI_SRC_DIR_PORTALS_TRUE@am__append_41 = -I$(top_srcdir)/src-portals
 @ARMCI_SRC_DIR_PORTALS_TRUE@am__append_42 = src-portals/tas_as.s
-@ARMCI_SRC_DIR_GEMINI_TRUE@am__append_43 = src-gemini/armci.c \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/armci_impl.h \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/clusterinfo.c \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/cray_memcpy_intel.s \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/cray_memcpy_amd.s \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.c \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.h \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/message.c \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/reg_cache.c \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/reg_cache.h
-@ARMCI_SRC_DIR_GEMINI_TRUE@am__append_44 = -I$(top_srcdir)/src-gemini
-@ARMCI_SRC_DIR_GEMINI_TRUE@am__append_45 = src-gemini/armci.h \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/message.h
+@ARMCI_SRC_DIR_DMAPP_TRUE@am__append_43 = src-dmapp/armci.c \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/armci_impl.h \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/clusterinfo.c \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/cray_memcpy_intel.s \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/cray_memcpy_amd.s \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/groups.c \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/groups.h \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/message.c \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/reg_cache.c \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/reg_cache.h
+@ARMCI_SRC_DIR_DMAPP_TRUE@am__append_44 = -I$(top_srcdir)/src-dmapp
+@ARMCI_SRC_DIR_DMAPP_TRUE@am__append_45 = src-dmapp/armci.h \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/message.h
 @ARMCI_SRC_DIR_OPENIB_TRUE@am__append_46 = src-openib/armci.c \
 @ARMCI_SRC_DIR_OPENIB_TRUE@	src-openib/armci_impl.h \
 @ARMCI_SRC_DIR_OPENIB_TRUE@	src-openib/armci_openib.h \
@@ -502,7 +502,7 @@ DIST_COMMON = README $(am__configure_deps) $(am__include_HEADERS_DIST) \
 #
 
 ##############################################################################
-# src-gemini
+# src-dmapp
 #
 
 ##############################################################################
@@ -737,12 +737,12 @@ am__libarmci_la_SOURCES_DIST = gaf2c/gaf2c.c gaf2c/drand.c \
 	src-portals/tas-ppc.h src-portals/utils.h src-portals/vector.c \
 	src-portals/new_memory.c src-portals/groups.c \
 	src-portals/gpc.c src-portals/threads.c src-portals/utils.c \
-	src-portals/tas.c src-gemini/armci.c src-gemini/armci_impl.h \
-	src-gemini/groups.c src-gemini/groups.h src-gemini/message.c \
-	src-gemini/clusterinfo.c \
-	src-gemini/cray_memcpy_intel.s \
-	src-gemini/cray_memcpy_amd.s \
-	src-gemini/reg_cache.c src-gemini/reg_cache.h \
+	src-portals/tas.c src-dmapp/armci.c src-dmapp/armci_impl.h \
+	src-dmapp/groups.c src-dmapp/groups.h src-dmapp/message.c \
+	src-dmapp/clusterinfo.c \
+	src-dmapp/cray_memcpy_intel.s \
+	src-dmapp/cray_memcpy_amd.s \
+	src-dmapp/reg_cache.c src-dmapp/reg_cache.h \
 	src-openib/armci.c src-openib/armci_impl.h \
 	src-openib/armci_openib.h src-openib/contig.c \
 	src-openib/device.c src-openib/device.h src-openib/fence.c \
@@ -931,13 +931,13 @@ am__dirstamp = $(am__leading_dot)dirstamp
 @ARMCI_SRC_DIR_PORTALS_TRUE@@THREAD_SAFE_TRUE@am__objects_12 = src-portals/threads.lo \
 @ARMCI_SRC_DIR_PORTALS_TRUE@@THREAD_SAFE_TRUE@	src-portals/utils.lo
 @ARMCI_SRC_DIR_PORTALS_TRUE@@INLINE_TAS_OKAY_TRUE@am__objects_13 = src-portals/tas.lo
-@ARMCI_SRC_DIR_GEMINI_TRUE@am__objects_14 = src-gemini/armci.lo \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/groups.lo \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/clusterinfo.lo \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/cray_memcpy_intel.lo \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/cray_memcpy_amd.lo \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/message.lo \
-@ARMCI_SRC_DIR_GEMINI_TRUE@	src-gemini/reg_cache.lo
+@ARMCI_SRC_DIR_DMAPP_TRUE@am__objects_14 = src-dmapp/armci.lo \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/groups.lo \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/clusterinfo.lo \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/cray_memcpy_intel.lo \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/cray_memcpy_amd.lo \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/message.lo \
+@ARMCI_SRC_DIR_DMAPP_TRUE@	src-dmapp/reg_cache.lo
 @ARMCI_SRC_DIR_OPENIB_TRUE@am__objects_15 = src-openib/armci.lo \
 @ARMCI_SRC_DIR_OPENIB_TRUE@	src-openib/contig.lo \
 @ARMCI_SRC_DIR_OPENIB_TRUE@	src-openib/device.lo \
@@ -1155,12 +1155,12 @@ am__libarmcii_la_SOURCES_DIST = gaf2c/gaf2c.c gaf2c/drand.c \
 	src-portals/tas-ppc.h src-portals/utils.h src-portals/vector.c \
 	src-portals/new_memory.c src-portals/groups.c \
 	src-portals/gpc.c src-portals/threads.c src-portals/utils.c \
-	src-portals/tas.c src-gemini/armci.c src-gemini/armci_impl.h \
-	src-gemini/groups.c src-gemini/groups.h src-gemini/message.c \
-	src-gemini/clusterinfo.c \
-	src-gemini/cray_memcpy_intel.s \
-	src-gemini/cray_memcpy_amd.s \
-	src-gemini/reg_cache.c src-gemini/reg_cache.h \
+	src-portals/tas.c src-dmapp/armci.c src-dmapp/armci_impl.h \
+	src-dmapp/groups.c src-dmapp/groups.h src-dmapp/message.c \
+	src-dmapp/clusterinfo.c \
+	src-dmapp/cray_memcpy_intel.s \
+	src-dmapp/cray_memcpy_amd.s \
+	src-dmapp/reg_cache.c src-dmapp/reg_cache.h \
 	src-openib/armci.c src-openib/armci_impl.h \
 	src-openib/armci_openib.h src-openib/contig.c \
 	src-openib/device.c src-openib/device.h src-openib/fence.c \
@@ -2001,7 +2001,7 @@ DIST_SOURCES = $(am__libarmci_la_SOURCES_DIST) \
 am__include_HEADERS_DIST = gaf2c/typesf2c.h gaf2c/farg.h \
 	tcgmsg/msgtypesc.h tcgmsg/msgtypesf.h tcgmsg/tcgmsg.fh \
 	tcgmsg/tcgmsg.h src-portals/armci.h src-portals/gpc.h \
-	src-portals/message.h src-gemini/armci.h src-gemini/message.h \
+	src-portals/message.h src-dmapp/armci.h src-dmapp/message.h \
 	src-openib/armci.h src-openib/message.h src-mpi/armci.h \
 	src-mpi/message.h src/include/armci.h src/include/gpc.h \
 	src/include/message.h tools/parmci.h
@@ -2702,7 +2702,7 @@ all: $(BUILT_SOURCES) config.h
 .SUFFIXES: .F .c .cc .f .html .lo .log .o .obj .s .test .test$(EXEEXT)
 am--refresh:
 	@:
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/tcgmsg/Makefile.inc $(top_srcdir)/src-portals/Makefile.inc $(top_srcdir)/src-gemini/Makefile.inc $(top_srcdir)/src-openib/Makefile.inc $(top_srcdir)/src-mpi/Makefile.inc $(top_srcdir)/src/Makefile.inc $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/tcgmsg/Makefile.inc $(top_srcdir)/src-portals/Makefile.inc $(top_srcdir)/src-dmapp/Makefile.inc $(top_srcdir)/src-openib/Makefile.inc $(top_srcdir)/src-mpi/Makefile.inc $(top_srcdir)/src/Makefile.inc $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -3067,26 +3067,26 @@ src-portals/utils.lo: src-portals/$(am__dirstamp) \
 	src-portals/$(DEPDIR)/$(am__dirstamp)
 src-portals/tas.lo: src-portals/$(am__dirstamp) \
 	src-portals/$(DEPDIR)/$(am__dirstamp)
-src-gemini/$(am__dirstamp):
-	@$(MKDIR_P) src-gemini
-	@: > src-gemini/$(am__dirstamp)
-src-gemini/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) src-gemini/$(DEPDIR)
-	@: > src-gemini/$(DEPDIR)/$(am__dirstamp)
-src-gemini/armci.lo: src-gemini/$(am__dirstamp) \
-	src-gemini/$(DEPDIR)/$(am__dirstamp)
-src-gemini/clusterinfo.lo: src-gemini/$(am__dirstamp) \
-	src-gemini/$(DEPDIR)/$(am__dirstamp)
-src-gemini/cray_memcpy_intel.lo: src-gemini/$(am__dirstamp) \
-	src-gemini/$(DEPDIR)/$(am__dirstamp)
-src-gemini/cray_memcpy_amd.lo: src-gemini/$(am__dirstamp) \
-	src-gemini/$(DEPDIR)/$(am__dirstamp)
-src-gemini/groups.lo: src-gemini/$(am__dirstamp) \
-	src-gemini/$(DEPDIR)/$(am__dirstamp)
-src-gemini/message.lo: src-gemini/$(am__dirstamp) \
-	src-gemini/$(DEPDIR)/$(am__dirstamp)
-src-gemini/reg_cache.lo: src-gemini/$(am__dirstamp) \
-	src-gemini/$(DEPDIR)/$(am__dirstamp)
+src-dmapp/$(am__dirstamp):
+	@$(MKDIR_P) src-dmapp
+	@: > src-dmapp/$(am__dirstamp)
+src-dmapp/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) src-dmapp/$(DEPDIR)
+	@: > src-dmapp/$(DEPDIR)/$(am__dirstamp)
+src-dmapp/armci.lo: src-dmapp/$(am__dirstamp) \
+	src-dmapp/$(DEPDIR)/$(am__dirstamp)
+src-dmapp/clusterinfo.lo: src-dmapp/$(am__dirstamp) \
+	src-dmapp/$(DEPDIR)/$(am__dirstamp)
+src-dmapp/cray_memcpy_intel.lo: src-dmapp/$(am__dirstamp) \
+	src-dmapp/$(DEPDIR)/$(am__dirstamp)
+src-dmapp/cray_memcpy_amd.lo: src-dmapp/$(am__dirstamp) \
+	src-dmapp/$(DEPDIR)/$(am__dirstamp)
+src-dmapp/groups.lo: src-dmapp/$(am__dirstamp) \
+	src-dmapp/$(DEPDIR)/$(am__dirstamp)
+src-dmapp/message.lo: src-dmapp/$(am__dirstamp) \
+	src-dmapp/$(DEPDIR)/$(am__dirstamp)
+src-dmapp/reg_cache.lo: src-dmapp/$(am__dirstamp) \
+	src-dmapp/$(DEPDIR)/$(am__dirstamp)
 src-openib/$(am__dirstamp):
 	@$(MKDIR_P) src-openib
 	@: > src-openib/$(am__dirstamp)
@@ -4053,20 +4053,20 @@ mostlyclean-compile:
 	-rm -f gaf2c/gaf2c.lo
 	-rm -f gaf2c/testarg.$(OBJEXT)
 	-rm -f gaf2c/testargf.$(OBJEXT)
-	-rm -f src-gemini/armci.$(OBJEXT)
-	-rm -f src-gemini/armci.lo
-	-rm -f src-gemini/clusterinfo.$(OBJEXT)
-	-rm -f src-gemini/clusterinfo.lo
-	-rm -f src-gemini/cray_memcpy_intel.$(OBJEXT)
-	-rm -f src-gemini/cray_memcpy_intel.lo
-	-rm -f src-gemini/cray_memcpy_amd.$(OBJEXT)
-	-rm -f src-gemini/cray_memcpy_amd.lo
-	-rm -f src-gemini/groups.$(OBJEXT)
-	-rm -f src-gemini/groups.lo
-	-rm -f src-gemini/message.$(OBJEXT)
-	-rm -f src-gemini/message.lo
-	-rm -f src-gemini/reg_cache.$(OBJEXT)
-	-rm -f src-gemini/reg_cache.lo
+	-rm -f src-dmapp/armci.$(OBJEXT)
+	-rm -f src-dmapp/armci.lo
+	-rm -f src-dmapp/clusterinfo.$(OBJEXT)
+	-rm -f src-dmapp/clusterinfo.lo
+	-rm -f src-dmapp/cray_memcpy_intel.$(OBJEXT)
+	-rm -f src-dmapp/cray_memcpy_intel.lo
+	-rm -f src-dmapp/cray_memcpy_amd.$(OBJEXT)
+	-rm -f src-dmapp/cray_memcpy_amd.lo
+	-rm -f src-dmapp/groups.$(OBJEXT)
+	-rm -f src-dmapp/groups.lo
+	-rm -f src-dmapp/message.$(OBJEXT)
+	-rm -f src-dmapp/message.lo
+	-rm -f src-dmapp/reg_cache.$(OBJEXT)
+	-rm -f src-dmapp/reg_cache.lo
 	-rm -f src-mpi/armci.$(OBJEXT)
 	-rm -f src-mpi/armci.lo
 	-rm -f src-mpi/groups.$(OBJEXT)
@@ -4578,10 +4578,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@gaf2c/$(DEPDIR)/drand.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@gaf2c/$(DEPDIR)/gaf2c.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@gaf2c/$(DEPDIR)/testarg.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@src-gemini/$(DEPDIR)/armci.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@src-gemini/$(DEPDIR)/groups.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@src-gemini/$(DEPDIR)/message.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@src-gemini/$(DEPDIR)/reg_cache.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src-dmapp/$(DEPDIR)/armci.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src-dmapp/$(DEPDIR)/groups.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src-dmapp/$(DEPDIR)/message.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src-dmapp/$(DEPDIR)/reg_cache.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src-mpi/$(DEPDIR)/armci.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src-mpi/$(DEPDIR)/groups.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src-mpi/$(DEPDIR)/message.Plo@am__quote@
@@ -4965,7 +4965,7 @@ clean-libtool:
 	-rm -rf examples/features/symmetric_memory/simple/.libs examples/features/symmetric_memory/simple/_libs
 	-rm -rf examples/simpleApps/.libs examples/simpleApps/_libs
 	-rm -rf gaf2c/.libs gaf2c/_libs
-	-rm -rf src-gemini/.libs src-gemini/_libs
+	-rm -rf src-dmapp/.libs src-dmapp/_libs
 	-rm -rf src-mpi/.libs src-mpi/_libs
 	-rm -rf src-openib/.libs src-openib/_libs
 	-rm -rf src-portals/.libs src-portals/_libs
@@ -5537,8 +5537,8 @@ distclean-generic:
 	-rm -f examples/simpleApps/$(am__dirstamp)
 	-rm -f gaf2c/$(DEPDIR)/$(am__dirstamp)
 	-rm -f gaf2c/$(am__dirstamp)
-	-rm -f src-gemini/$(DEPDIR)/$(am__dirstamp)
-	-rm -f src-gemini/$(am__dirstamp)
+	-rm -f src-dmapp/$(DEPDIR)/$(am__dirstamp)
+	-rm -f src-dmapp/$(am__dirstamp)
 	-rm -f src-mpi/$(DEPDIR)/$(am__dirstamp)
 	-rm -f src-mpi/$(am__dirstamp)
 	-rm -f src-openib/$(DEPDIR)/$(am__dirstamp)
@@ -5605,7 +5605,7 @@ clean-am: clean-binPROGRAMS clean-checkLTLIBRARIES clean-checkPROGRAMS \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf examples/benchmarks/RandomAccess/$(DEPDIR) examples/benchmarks/RandomAccess/simple/$(DEPDIR) examples/benchmarks/RandomAccess/smp_bucket/$(DEPDIR) examples/benchmarks/cg/armci_sharedmemory/$(DEPDIR) examples/benchmarks/lu/armci_blocking/$(DEPDIR) examples/benchmarks/lu/armci_multithreaded/$(DEPDIR) examples/benchmarks/lu/armci_nonblocking/$(DEPDIR) examples/benchmarks/lu/pthreads/$(DEPDIR) examples/features/aggregation/simple/$(DEPDIR) examples/features/aggregation/sparse_matvecmul/$(DEPDIR) examples/features/concurrency/multidma/$(DEPDIR) examples/features/concurrency/simple/$(DEPDIR) examples/features/gpc/hashtable/$(DEPDIR) examples/features/non-blocking/overlap/$(DEPDIR) examples/features/non-blocking/simple/$(DEPDIR) examples/features/notification/simple/$(DEPDIR) examples/features/proc_affinity/computation_impact/$(DEPDIR) examples/features/proc_affinity/simple/$(DEPDIR) examples/features/symmetric_memory/simple/$(DEPDIR) examples/simpleApps/$(DEPDIR) gaf2c/$(DEPDIR) src-gemini/$(DEPDIR) src-mpi/$(DEPDIR) src-openib/$(DEPDIR) src-portals/$(DEPDIR) src/collectives/$(DEPDIR) src/common/$(DEPDIR) src/devices/bgml/$(DEPDIR) src/devices/dcmf/dcmf-0.2.0/$(DEPDIR) src/devices/dcmf/dcmf-0.3.0/$(DEPDIR) src/devices/dcmf/dcmf2/$(DEPDIR) src/devices/lapi/$(DEPDIR) src/devices/mpi-mt/$(DEPDIR) src/devices/mpi-spawn/$(DEPDIR) src/devices/sockets/$(DEPDIR) src/ft/$(DEPDIR) src/locks/$(DEPDIR) src/memory/$(DEPDIR) src/progress/$(DEPDIR) src/util/$(DEPDIR) src/xfer/$(DEPDIR) tcgmsg/$(DEPDIR) tcgmsg/ipcv4.0/$(DEPDIR) tcgmsg/ipcv5.0/$(DEPDIR) tcgmsg/tcgmsg-mpi/$(DEPDIR) testing/$(DEPDIR) tools/$(DEPDIR)
+	-rm -rf examples/benchmarks/RandomAccess/$(DEPDIR) examples/benchmarks/RandomAccess/simple/$(DEPDIR) examples/benchmarks/RandomAccess/smp_bucket/$(DEPDIR) examples/benchmarks/cg/armci_sharedmemory/$(DEPDIR) examples/benchmarks/lu/armci_blocking/$(DEPDIR) examples/benchmarks/lu/armci_multithreaded/$(DEPDIR) examples/benchmarks/lu/armci_nonblocking/$(DEPDIR) examples/benchmarks/lu/pthreads/$(DEPDIR) examples/features/aggregation/simple/$(DEPDIR) examples/features/aggregation/sparse_matvecmul/$(DEPDIR) examples/features/concurrency/multidma/$(DEPDIR) examples/features/concurrency/simple/$(DEPDIR) examples/features/gpc/hashtable/$(DEPDIR) examples/features/non-blocking/overlap/$(DEPDIR) examples/features/non-blocking/simple/$(DEPDIR) examples/features/notification/simple/$(DEPDIR) examples/features/proc_affinity/computation_impact/$(DEPDIR) examples/features/proc_affinity/simple/$(DEPDIR) examples/features/symmetric_memory/simple/$(DEPDIR) examples/simpleApps/$(DEPDIR) gaf2c/$(DEPDIR) src-dmapp/$(DEPDIR) src-mpi/$(DEPDIR) src-openib/$(DEPDIR) src-portals/$(DEPDIR) src/collectives/$(DEPDIR) src/common/$(DEPDIR) src/devices/bgml/$(DEPDIR) src/devices/dcmf/dcmf-0.2.0/$(DEPDIR) src/devices/dcmf/dcmf-0.3.0/$(DEPDIR) src/devices/dcmf/dcmf2/$(DEPDIR) src/devices/lapi/$(DEPDIR) src/devices/mpi-mt/$(DEPDIR) src/devices/mpi-spawn/$(DEPDIR) src/devices/sockets/$(DEPDIR) src/ft/$(DEPDIR) src/locks/$(DEPDIR) src/memory/$(DEPDIR) src/progress/$(DEPDIR) src/util/$(DEPDIR) src/xfer/$(DEPDIR) tcgmsg/$(DEPDIR) tcgmsg/ipcv4.0/$(DEPDIR) tcgmsg/ipcv5.0/$(DEPDIR) tcgmsg/tcgmsg-mpi/$(DEPDIR) testing/$(DEPDIR) tools/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-hdr distclean-libtool distclean-tags
@@ -5653,7 +5653,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf examples/benchmarks/RandomAccess/$(DEPDIR) examples/benchmarks/RandomAccess/simple/$(DEPDIR) examples/benchmarks/RandomAccess/smp_bucket/$(DEPDIR) examples/benchmarks/cg/armci_sharedmemory/$(DEPDIR) examples/benchmarks/lu/armci_blocking/$(DEPDIR) examples/benchmarks/lu/armci_multithreaded/$(DEPDIR) examples/benchmarks/lu/armci_nonblocking/$(DEPDIR) examples/benchmarks/lu/pthreads/$(DEPDIR) examples/features/aggregation/simple/$(DEPDIR) examples/features/aggregation/sparse_matvecmul/$(DEPDIR) examples/features/concurrency/multidma/$(DEPDIR) examples/features/concurrency/simple/$(DEPDIR) examples/features/gpc/hashtable/$(DEPDIR) examples/features/non-blocking/overlap/$(DEPDIR) examples/features/non-blocking/simple/$(DEPDIR) examples/features/notification/simple/$(DEPDIR) examples/features/proc_affinity/computation_impact/$(DEPDIR) examples/features/proc_affinity/simple/$(DEPDIR) examples/features/symmetric_memory/simple/$(DEPDIR) examples/simpleApps/$(DEPDIR) gaf2c/$(DEPDIR) src-gemini/$(DEPDIR) src-mpi/$(DEPDIR) src-openib/$(DEPDIR) src-portals/$(DEPDIR) src/collectives/$(DEPDIR) src/common/$(DEPDIR) src/devices/bgml/$(DEPDIR) src/devices/dcmf/dcmf-0.2.0/$(DEPDIR) src/devices/dcmf/dcmf-0.3.0/$(DEPDIR) src/devices/dcmf/dcmf2/$(DEPDIR) src/devices/lapi/$(DEPDIR) src/devices/mpi-mt/$(DEPDIR) src/devices/mpi-spawn/$(DEPDIR) src/devices/sockets/$(DEPDIR) src/ft/$(DEPDIR) src/locks/$(DEPDIR) src/memory/$(DEPDIR) src/progress/$(DEPDIR) src/util/$(DEPDIR) src/xfer/$(DEPDIR) tcgmsg/$(DEPDIR) tcgmsg/ipcv4.0/$(DEPDIR) tcgmsg/ipcv5.0/$(DEPDIR) tcgmsg/tcgmsg-mpi/$(DEPDIR) testing/$(DEPDIR) tools/$(DEPDIR)
+	-rm -rf examples/benchmarks/RandomAccess/$(DEPDIR) examples/benchmarks/RandomAccess/simple/$(DEPDIR) examples/benchmarks/RandomAccess/smp_bucket/$(DEPDIR) examples/benchmarks/cg/armci_sharedmemory/$(DEPDIR) examples/benchmarks/lu/armci_blocking/$(DEPDIR) examples/benchmarks/lu/armci_multithreaded/$(DEPDIR) examples/benchmarks/lu/armci_nonblocking/$(DEPDIR) examples/benchmarks/lu/pthreads/$(DEPDIR) examples/features/aggregation/simple/$(DEPDIR) examples/features/aggregation/sparse_matvecmul/$(DEPDIR) examples/features/concurrency/multidma/$(DEPDIR) examples/features/concurrency/simple/$(DEPDIR) examples/features/gpc/hashtable/$(DEPDIR) examples/features/non-blocking/overlap/$(DEPDIR) examples/features/non-blocking/simple/$(DEPDIR) examples/features/notification/simple/$(DEPDIR) examples/features/proc_affinity/computation_impact/$(DEPDIR) examples/features/proc_affinity/simple/$(DEPDIR) examples/features/symmetric_memory/simple/$(DEPDIR) examples/simpleApps/$(DEPDIR) gaf2c/$(DEPDIR) src-dmapp/$(DEPDIR) src-mpi/$(DEPDIR) src-openib/$(DEPDIR) src-portals/$(DEPDIR) src/collectives/$(DEPDIR) src/common/$(DEPDIR) src/devices/bgml/$(DEPDIR) src/devices/dcmf/dcmf-0.2.0/$(DEPDIR) src/devices/dcmf/dcmf-0.3.0/$(DEPDIR) src/devices/dcmf/dcmf2/$(DEPDIR) src/devices/lapi/$(DEPDIR) src/devices/mpi-mt/$(DEPDIR) src/devices/mpi-spawn/$(DEPDIR) src/devices/sockets/$(DEPDIR) src/ft/$(DEPDIR) src/locks/$(DEPDIR) src/memory/$(DEPDIR) src/progress/$(DEPDIR) src/util/$(DEPDIR) src/xfer/$(DEPDIR) tcgmsg/$(DEPDIR) tcgmsg/ipcv4.0/$(DEPDIR) tcgmsg/ipcv5.0/$(DEPDIR) tcgmsg/tcgmsg-mpi/$(DEPDIR) testing/$(DEPDIR) tools/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

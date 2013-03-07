@@ -738,8 +738,8 @@ ARMCI_SRC_DIR_SRC_FALSE
 ARMCI_SRC_DIR_SRC_TRUE
 ARMCI_SRC_DIR_MPI_FALSE
 ARMCI_SRC_DIR_MPI_TRUE
-ARMCI_SRC_DIR_GEMINI_FALSE
-ARMCI_SRC_DIR_GEMINI_TRUE
+ARMCI_SRC_DIR_DMAPP_FALSE
+ARMCI_SRC_DIR_DMAPP_TRUE
 ARMCI_SRC_DIR_PORTALS_FALSE
 ARMCI_SRC_DIR_PORTALS_TRUE
 ARMCI_SRC_DIR_OPENIB_FALSE
@@ -758,8 +758,8 @@ ARMCI_NETWORK_SOCKETS_FALSE
 ARMCI_NETWORK_SOCKETS_TRUE
 ARMCI_NETWORK_PORTALS_FALSE
 ARMCI_NETWORK_PORTALS_TRUE
-ARMCI_NETWORK_GEMINI_FALSE
-ARMCI_NETWORK_GEMINI_TRUE
+ARMCI_NETWORK_DMAPP_FALSE
+ARMCI_NETWORK_DMAPP_TRUE
 ARMCI_NETWORK_OPENIB_FALSE
 ARMCI_NETWORK_OPENIB_TRUE
 ARMCI_NETWORK_MPI_SPAWN_FALSE
@@ -979,7 +979,7 @@ with_mpi_mt
 with_mpi_spawn
 with_openib
 with_portals
-with_gemini
+with_dmapp
 with_sockets
 enable_assert
 enable_largefile
@@ -1713,7 +1713,7 @@ Optional Packages:
   --with-mpi-spawn[=ARG]  select armci network as MPI-2 dynamic process mgmt
   --with-openib[=ARG]     select armci network as Infiniband OpenIB
   --with-portals[=ARG]    select armci network as Cray XT portals
-  --with-gemini[=ARG]     select armci network as Cray XE Gemini
+  --with-dmapp[=ARG]      select armci network as Cray XE/XC DMAPP
   --with-sockets[=ARG]    select armci network as Ethernet TCP/IP
   --with-blas[=ARG]       use external BLAS library; attempt to detect
                           sizeof(INTEGER)
@@ -8002,19 +8002,19 @@ fi
 
 
 
-# Check whether --with-gemini was given.
-if test "${with_gemini+set}" = set; then :
-  withval=$with_gemini;
+# Check whether --with-dmapp was given.
+if test "${with_dmapp+set}" = set; then :
+  withval=$with_dmapp;
 fi
 
 
 
-if test "x$with_gemini" != x; then :
+if test "x$with_dmapp" != x; then :
   if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (void*))" "ga_arg_parse_sizeof_voidp"        ""; then :
 
 fi
 
-for arg in $with_gemini ; do
+for arg in $with_dmapp ; do
     case $arg in #(
   yes) :
      ;; #(
@@ -8038,57 +8038,57 @@ for arg in $with_gemini ; do
     if test -d $arg; then :
   ARMCI_NETWORK_LDFLAGS="$ARMCI_NETWORK_LDFLAGS -L$arg"
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi ;; #(
   *lib/) :
     if test -d $arg; then :
   ARMCI_NETWORK_LDFLAGS="$ARMCI_NETWORK_LDFLAGS -L$arg"
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi ;; #(
   *lib64) :
     if test -d $arg; then :
   ARMCI_NETWORK_LDFLAGS="$ARMCI_NETWORK_LDFLAGS -L$arg"
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi ;; #(
   *lib64/) :
     if test -d $arg; then :
   ARMCI_NETWORK_LDFLAGS="$ARMCI_NETWORK_LDFLAGS -L$arg"
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi ;; #(
   *include) :
     if test -d $arg; then :
   ARMCI_NETWORK_CPPFLAGS="$ARMCI_NETWORK_CPPFLAGS -I$arg"
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi ;; #(
   *include/) :
     if test -d $arg; then :
   ARMCI_NETWORK_CPPFLAGS="$ARMCI_NETWORK_CPPFLAGS -I$arg"
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi ;; #(
   *include64) :
     if test -d $arg; then :
   ARMCI_NETWORK_CPPFLAGS="$ARMCI_NETWORK_CPPFLAGS -I$arg"
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi ;; #(
   *include64/) :
     if test -d $arg; then :
   ARMCI_NETWORK_CPPFLAGS="$ARMCI_NETWORK_CPPFLAGS -I$arg"
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi ;; #(
   *) :
     ga_arg_parse_ok=no ;;
@@ -8133,13 +8133,13 @@ esac
 fi
 # warn user that $arg fell through
      if test "x$ga_arg_parse_ok" = xno; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_gemini not parsed" >&5
-$as_echo "$as_me: WARNING: $arg of with_gemini not parsed" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: $arg of with_dmapp not parsed" >&5
+$as_echo "$as_me: WARNING: $arg of with_dmapp not parsed" >&2;}
 fi
 done
 fi
-if test "x$with_gemini" != xno && test "x$with_gemini" != x; then :
-  ga_armci_network=GEMINI
+if test "x$with_dmapp" != xno && test "x$with_dmapp" != x; then :
+  ga_armci_network=DMAPP
      as_fn_arith $armci_network_count + 1 && armci_network_count=$as_val
 fi
 
@@ -8885,10 +8885,10 @@ if test "x$happy" = xyes; then :
 fi
 
 fi
-     if test "x$ga_armci_network" = x && test "x$with_gemini" != xno; then :
+     if test "x$ga_armci_network" = x && test "x$with_dmapp" != xno; then :
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: searching for GEMINI..." >&5
-$as_echo "$as_me: searching for GEMINI..." >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: searching for DMAPP..." >&5
+$as_echo "$as_me: searching for DMAPP..." >&6;}
 happy=yes
 if test "x$happy" = xyes; then :
   ac_fn_c_check_header_mongrel "$LINENO" "dmapp.h" "ac_cv_header_dmapp_h" "$ac_includes_default"
@@ -9181,7 +9181,7 @@ fi
 
 fi
 if test "x$happy" = xyes; then :
-  ga_armci_network=GEMINI; with_gemini=yes;
+  ga_armci_network=DMAPP; with_dmapp=yes;
 fi
 
 fi
@@ -10056,10 +10056,10 @@ else
 fi
 
 fi
-              if test "x$ga_armci_network" = xGEMINI; then :
+              if test "x$ga_armci_network" = xDMAPP; then :
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: searching for GEMINI..." >&5
-$as_echo "$as_me: searching for GEMINI..." >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: searching for DMAPP..." >&5
+$as_echo "$as_me: searching for DMAPP..." >&6;}
 happy=yes
 if test "x$happy" = xyes; then :
   ac_fn_c_check_header_mongrel "$LINENO" "dmapp.h" "ac_cv_header_dmapp_h" "$ac_includes_default"
@@ -10352,9 +10352,9 @@ fi
 
 fi
 if test "x$happy" = xyes; then :
-  ga_armci_network=GEMINI; with_gemini=yes;
+  ga_armci_network=DMAPP; with_dmapp=yes;
 else
-  as_fn_error $? "test for ARMCI_NETWORK=GEMINI failed" "$LINENO" 5
+  as_fn_error $? "test for ARMCI_NETWORK=DMAPP failed" "$LINENO" 5
 fi
 
 fi
@@ -10438,9 +10438,9 @@ fi
 
 
 
-if test "x$with_gemini" != x && test "x$with_gemini" != xno; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: --with-gemini=$with_gemini" >&5
-$as_echo "$as_me: WARNING: --with-gemini=$with_gemini" >&2;}
+if test "x$with_dmapp" != x && test "x$with_dmapp" != xno; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: --with-dmapp=$with_dmapp" >&5
+$as_echo "$as_me: WARNING: --with-dmapp=$with_dmapp" >&2;}
 fi
 
 
@@ -10576,12 +10576,12 @@ fi
 
 
 
- if test "x$with_gemini" != x && test "x$with_gemini" != xno; then
-  ARMCI_NETWORK_GEMINI_TRUE=
-  ARMCI_NETWORK_GEMINI_FALSE='#'
+ if test "x$with_dmapp" != x && test "x$with_dmapp" != xno; then
+  ARMCI_NETWORK_DMAPP_TRUE=
+  ARMCI_NETWORK_DMAPP_FALSE='#'
 else
-  ARMCI_NETWORK_GEMINI_TRUE='#'
-  ARMCI_NETWORK_GEMINI_FALSE=
+  ARMCI_NETWORK_DMAPP_TRUE='#'
+  ARMCI_NETWORK_DMAPP_FALSE=
 fi
 
 
@@ -10651,8 +10651,8 @@ case $ga_armci_network in #(
     ARMCI_SRC_DIR=src-openib ;; #(
   PORTALS) :
     ARMCI_SRC_DIR=src-portals ;; #(
-  GEMINI) :
-    ARMCI_SRC_DIR=src-gemini ;; #(
+  DMAPP) :
+    ARMCI_SRC_DIR=src-dmapp ;; #(
   MPI_TS) :
     ARMCI_SRC_DIR=src-mpi ;; #(
   *) :
@@ -10675,12 +10675,12 @@ else
   ARMCI_SRC_DIR_PORTALS_FALSE=
 fi
 
- if test "x$ARMCI_SRC_DIR" = "xsrc-gemini"; then
-  ARMCI_SRC_DIR_GEMINI_TRUE=
-  ARMCI_SRC_DIR_GEMINI_FALSE='#'
+ if test "x$ARMCI_SRC_DIR" = "xsrc-dmapp"; then
+  ARMCI_SRC_DIR_DMAPP_TRUE=
+  ARMCI_SRC_DIR_DMAPP_FALSE='#'
 else
-  ARMCI_SRC_DIR_GEMINI_TRUE='#'
-  ARMCI_SRC_DIR_GEMINI_FALSE=
+  ARMCI_SRC_DIR_DMAPP_TRUE='#'
+  ARMCI_SRC_DIR_DMAPP_FALSE=
 fi
 
  if test "x$ARMCI_SRC_DIR" = "xsrc-mpi"; then
@@ -10733,7 +10733,7 @@ if test "x$ARMCI_TOP_BUILDDIR" != x; then :
 
     if test x$ga_cv_sysv = xno; then :
   case $ga_armci_network in #(
-  BGML|DCMF|PORTALS|GEMINI) :
+  BGML|DCMF|PORTALS|DMAPP) :
     ga_cv_sysv_hack=no ;; #(
   *) :
     ga_cv_sysv_hack=yes ;;
@@ -35723,16 +35723,16 @@ $as_echo "#define QUADRICS 1" >>confdefs.h
 $as_echo "#define DOELAN4 1" >>confdefs.h
 
      ;; #(
-  GEMINI) :
+  DMAPP) :
 
 
-$as_echo "#define LIBONESIDED 1" >>confdefs.h
+$as_echo "#define LIBONESIDED 0" >>confdefs.h
 
 
 $as_echo "#define CRAY_UGNI 1" >>confdefs.h
 
 
-$as_echo "#define GEMINI 1" >>confdefs.h
+$as_echo "#define DMAPP 1" >>confdefs.h
 
      ;; #(
   GM) :
@@ -36367,8 +36367,8 @@ if test -z "${ARMCI_NETWORK_OPENIB_TRUE}" && test -z "${ARMCI_NETWORK_OPENIB_FAL
   as_fn_error $? "conditional \"ARMCI_NETWORK_OPENIB\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
-if test -z "${ARMCI_NETWORK_GEMINI_TRUE}" && test -z "${ARMCI_NETWORK_GEMINI_FALSE}"; then
-  as_fn_error $? "conditional \"ARMCI_NETWORK_GEMINI\" was never defined.
+if test -z "${ARMCI_NETWORK_DMAPP_TRUE}" && test -z "${ARMCI_NETWORK_DMAPP_FALSE}"; then
+  as_fn_error $? "conditional \"ARMCI_NETWORK_DMAPP\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${ARMCI_NETWORK_PORTALS_TRUE}" && test -z "${ARMCI_NETWORK_PORTALS_FALSE}"; then
@@ -36399,8 +36399,8 @@ if test -z "${ARMCI_SRC_DIR_PORTALS_TRUE}" && test -z "${ARMCI_SRC_DIR_PORTALS_F
   as_fn_error $? "conditional \"ARMCI_SRC_DIR_PORTALS\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
-if test -z "${ARMCI_SRC_DIR_GEMINI_TRUE}" && test -z "${ARMCI_SRC_DIR_GEMINI_FALSE}"; then
-  as_fn_error $? "conditional \"ARMCI_SRC_DIR_GEMINI\" was never defined.
+if test -z "${ARMCI_SRC_DIR_DMAPP_TRUE}" && test -z "${ARMCI_SRC_DIR_DMAPP_FALSE}"; then
+  as_fn_error $? "conditional \"ARMCI_SRC_DIR_DMAPP\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${ARMCI_SRC_DIR_MPI_TRUE}" && test -z "${ARMCI_SRC_DIR_MPI_FALSE}"; then
