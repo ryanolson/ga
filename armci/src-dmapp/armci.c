@@ -32,6 +32,8 @@
 
 #define DEBUG 0
 
+#define ARMCI_MAX(a,b) (((a)>(b))?(a):(b))
+#define ARMCI_MIN(a,b) (((a)<(b))?(a):(b))
 
 #if HAVE_DMAPP_LOCK
 // ARMCI_MAX_LOCKS mirrors the default DMAPP_MAX_LOCKS limit
@@ -46,7 +48,7 @@ static int use_locks_on_put = 0;
 
 #if HAVE_DMAPP_QUEUE
 static int armci_use_rem_acc = HAVE_DMAPP_QUEUE;
-static long armci_rem_acc_threshold = 128*1024;
+static long armci_rem_acc_threshold = ARMCI_REM_ACC_THRESHOLD;
 dmapp_queue_handle_t  armci_queue_hndl;
 static uint32_t armci_dmapp_qdepth = DMAPP_QUEUE_DEFAULT_DEPTH;
 static uint32_t armci_dmapp_qnelems = DMAPP_QUEUE_DEFAULT_NELEMS;
@@ -583,9 +585,13 @@ int PARMCI_Acc(int datatype, void *scale,
 }
 
 /* Perform the scaled Accumulate operation on src/dst array leaving result in dst array */
-static void
+static inline void
 do_acc(void *src, void *dst, int datatype, void *scale, int count)
 {
+#if 0
+    printf("%d : do_acc src %p dst %p datatype %d count %d\n",
+           l_state.rank, src, dst, datatype, count);
+#endif
 #define EQ_ONE_REG(A) ((A) == 1.0)
 #define EQ_ONE_CPL(A) ((A).real == 1.0 && (A).imag == 0.0)
 #define IADD_REG(A,B) (A) += (B)
@@ -768,6 +774,17 @@ static int do_AccS(int datatype, void *scale,
 
 
 #if HAVE_DMAPP_QUEUE
+typedef struct acc_buffer {
+    char *get_buf;
+    long src_idx;
+    long dst_idx;
+    long sizetoget;
+    dmapp_syncid_handle_t syncid;
+} rem_acc_buffer_t;
+
+#define PIPEDEPTH 16
+#define CHUNK_SIZE_1D (32*1024)
+
 static int do_remote_AccS(int datatype, void *scale,
                           void *src_ptr, int src_stride_ar[/*stride_levels*/],
                           dmapp_seg_desc_t *src_seg,
@@ -781,14 +798,49 @@ static int do_remote_AccS(int datatype, void *scale,
     int dst_bvalue[7], dst_bunit[7];
     int dmapp_status = DMAPP_RC_SUCCESS;
     int sizetoget;
-    void *get_buf = NULL;
+    char *get_buf[PIPEDEPTH];
     long k = 0;
     dmapp_return_t status;
+    rem_acc_buffer_t *rem_acc_buf;
+    int pipedepth;
+    int buffered_1d = 0;
 
     /* number of n-element of the first dimension */
     n1dim = 1;
     for(i=1; i<=stride_levels; i++)
         n1dim *= count[i];
+
+    sizetoget = count[0];
+
+    /* Convert 1d operations into strided ones to gain from buffering */
+    if(n1dim == 1 && sizetoget > CHUNK_SIZE_1D) {
+        n1dim = sizetoget / CHUNK_SIZE_1D;
+        if(sizetoget % CHUNK_SIZE_1D) n1dim++;
+        sizetoget = CHUNK_SIZE_1D;
+        buffered_1d = 1;
+    }
+
+    rem_acc_buf = malloc(n1dim*sizeof(rem_acc_buffer_t));
+    assert(rem_acc_buf);
+
+    pipedepth = ARMCI_MIN(n1dim, PIPEDEPTH);
+
+#if 0
+    printf("%d: n1dim %d count[0] %d sizetoget %d stride_levels %d pipedepth %d buffered_1d %d\n",
+           l_state.rank, n1dim, count[0], sizetoget, stride_levels, pipedepth, buffered_1d);
+#endif
+
+    if(sizetoget*pipedepth <= l_state.acc_buf_len) {
+        // use pre-allocated buffer
+        get_buf[0] = l_state.acc_buf;
+    }
+    else {
+        // allocate the temporary buffers
+        get_buf[0] = (char *)my_malloc(sizetoget * pipedepth);
+        assert(get_buf);
+    }
+    for(i = 1; i < pipedepth; i++)
+        get_buf[i] = get_buf[i-1] + sizetoget;
 
     /* calculate the destination indices */
     src_bvalue[0] = 0; src_bvalue[1] = 0; src_bunit[0] = 1; src_bunit[1] = 1;
@@ -801,20 +853,6 @@ static int do_remote_AccS(int datatype, void *scale,
         src_bunit[i] = src_bunit[i-1] * count[i-1];
         dst_bunit[i] = dst_bunit[i-1] * count[i-1];
     }
-
-    sizetoget = count[0];
-
-    if (sizetoget <= l_state.acc_buf_len) {
-        get_buf = l_state.acc_buf;
-    }
-    else {
-            // allocate the temporary buffer
-            get_buf = (char *)my_malloc(sizeof(char) * sizetoget);
-            assert(get_buf);
-    }
-
-    // grab the atomic lock
-    dmapp_network_lock(proc);
 
     for(i=0; i<n1dim; i++) {
         src_idx = 0;
@@ -840,24 +878,62 @@ static int do_remote_AccS(int datatype, void *scale,
             }
         }
 
-        // Get the remote data in to a temp buffer
-        //PARMCI_Get((char *)src_ptr + src_idx, get_buf, sizetoget, proc);
-        status = dmapp_get(get_buf, (char *)src_ptr + src_idx, src_seg, proc, sizetoget/sizeof(long), DMAPP_QW);
+        if(buffered_1d) {
+           dst_idx = src_idx = i*CHUNK_SIZE_1D;
+           // on last iteration resize sizetoget
+           if(i+1 == n1dim) sizetoget = count[0] - (i*CHUNK_SIZE_1D);
+        }
+
+        rem_acc_buf[i].get_buf = get_buf[i%pipedepth];
+        rem_acc_buf[i].src_idx = src_idx;
+        rem_acc_buf[i].dst_idx = dst_idx;
+        rem_acc_buf[i].sizetoget = sizetoget;
+    }
+
+    // grab the atomic lock (in our rank)
+    dmapp_network_lock(l_state.rank);
+
+    /* Fill the async Get pipe */
+    for(i = 0; i < pipedepth; i++) {
+        rem_acc_buffer_t *curr = &rem_acc_buf[i];
+
+        /* Issue async Get in to a temp buffer */
+        status = dmapp_get_nb(curr->get_buf, (char *)src_ptr + curr->src_idx, src_seg, proc,
+                              curr->sizetoget/sizeof(long), DMAPP_QW, &curr->syncid);
+        assert(status == DMAPP_RC_SUCCESS);
+    }
+
+    for(i = 0; i < n1dim; i++) {
+        rem_acc_buffer_t *curr = &rem_acc_buf[i];
+
+        /* Wait for the previous async Get */
+        status = dmapp_syncid_wait(&curr->syncid);
         assert(status == DMAPP_RC_SUCCESS);
 
         /* Now perform the Accumulate operation leaving the result in dst buf */
-        do_acc(get_buf, (char *)dst_ptr + dst_idx, datatype, scale, sizetoget);
+        do_acc(curr->get_buf, (char *)dst_ptr + curr->dst_idx, datatype, scale, curr->sizetoget);
+
+        if (i+pipedepth < n1dim) {
+            rem_acc_buffer_t *next = &rem_acc_buf[i+pipedepth];
+
+            /* Issue the next async Get in to a temp buffer */
+            status = dmapp_get_nb(next->get_buf, (char *)src_ptr + next->src_idx, src_seg, proc,
+                                  next->sizetoget/sizeof(long), DMAPP_QW, &next->syncid);
+            assert(status == DMAPP_RC_SUCCESS);
+        }
     }
 
     // ungrab the lock
-    dmapp_network_unlock(proc);
+    dmapp_network_unlock(l_state.rank);
 
     // Notify source that request has completed
     parmci_notify(proc);
 
     // free temp buffer
-    if (get_buf && sizetoget > l_state.acc_buf_len)
-        my_free(get_buf);
+    if (get_buf[0] != l_state.acc_buf)
+        my_free(get_buf[0]);
+
+    free(rem_acc_buf);
 
     return 0;
 }
@@ -911,9 +987,35 @@ static int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
 
 static int armci_queue_cb(void *context, void *data, uint32_t len, dmapp_pe_t rank)
 {
+    static int first_call = 1;
+    dmapp_return_t status;
+    dmapp_rma_attrs_ext_t attrs;
+
+    /* Set the DMAPP attributes on first invocation of the helper thread */
+    if (first_call == 1) {
+        /* Read the current attributes */
+        status = dmapp_get_rma_attrs_ext(&attrs);
+        assert(status == DMAPP_RC_SUCCESS);
+
+        /* Update the per thread attributes we want to change */
+        /* Note we use the GET threshold here as the accumulate thread only does GETs */
+        attrs.offload_threshold = l_state.dmapp_get_threshold;
+        attrs.put_relaxed_ordering = l_state.dmapp_put_routing;
+        attrs.get_relaxed_ordering = l_state.dmapp_get_routing;
+
+        /* Change the attributes in this thread */
+        status = dmapp_set_rma_attrs_ext(&attrs, &attrs);
+        assert(status == DMAPP_RC_SUCCESS);
+
+        first_call=0;
+    }
+
     return process_remote_AccS(data, len, rank);
 }
 
+/* Attempt to perform the Remote ACC using a helper thread
+ * Returns -1 if this is not possible
+ */
 static int send_remote_AccS(int datatype, void *scale,
                             void *src_ptr, int src_stride_ar[/*stride_levels*/],
                             void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
@@ -926,13 +1028,19 @@ static int send_remote_AccS(int datatype, void *scale,
 
     for(i=0, bytes=1; i<=stride_levels;i++) bytes*=count[i];
 
-#if 0
-    printf("Send Rem AccS: count %d bytes %d strides %d to proc %d\n",
-           count[0], bytes, stride_levels, proc);
-#endif
+    /* Test whether we should use the Remote ACC thread */
+    if (bytes < armci_rem_acc_threshold)
+        return -1;
 
+    /* The local buffer must be network accessible for Remote ACC to work */
     src_reg = reg_cache_find(l_state.rank, src_ptr, bytes);
-    assert(src_reg);
+    if (src_reg == NULL)
+        return -1;
+
+#if 0
+    printf("%d: Send Rem AccS: count %d bytes %d strides %d to proc %d\n",
+           l_state.rank, count[0], bytes, stride_levels, proc);
+#endif
 
     hdrsize = (2*sizeof(void*) /* src_ptr + dst-ptr */ +
                sizeof(dmapp_seg_desc_t) /* src seg desc */ +
@@ -967,7 +1075,6 @@ static int send_remote_AccS(int datatype, void *scale,
     msg += sizeof(int)*(stride_levels+1);
     *(int *)msg = datatype;
     msg += sizeof(int);
-    scale = msg;
     /* pack scale */
     switch(datatype){
     case ARMCI_ACC_INT:
@@ -1020,9 +1127,9 @@ int PARMCI_AccS(int datatype, void *scale,
 #endif
 #if HAVE_DMAPP_QUEUE
             /* DMAPP Queue based Remote accumulate */
-            if (armci_use_rem_acc && count[0] >= armci_rem_acc_threshold)
-                return send_remote_AccS(datatype, scale, src_ptr, src_stride_ar,
-                                        dst_ptr, dst_stride_ar, count , stride_levels, proc);
+            if (armci_use_rem_acc && send_remote_AccS(datatype, scale, src_ptr, src_stride_ar,
+                                                      dst_ptr, dst_stride_ar, count, stride_levels, proc) == 0)
+                ;
             else
 #endif
                 return do_AccS(datatype, scale, src_ptr, src_stride_ar,
@@ -1308,7 +1415,8 @@ static void dmapp_alloc_buf(void)
 {
     // FAILURE_BUFSIZE should be some multiple of our page size?
     //l_state.acc_buf_len = FAILURE_BUFSIZE;
-    l_state.acc_buf_len = armci_page_size;
+//    l_state.acc_buf_len = armci_page_size;
+    l_state.acc_buf_len = ARMCI_MAX((armci_page_size), (8*1024*1024));
     l_state.acc_buf = PARMCI_Malloc_local( l_state.acc_buf_len);
     assert(l_state.acc_buf);
 
@@ -1352,7 +1460,7 @@ void cpu_yield()
 #elif defined(WIN32)
                Sleep(1);
 #elif defined(_POSIX_PRIORITY_SCHEDULING)
-//               sched_yield();
+               sched_yield();
 #else
                usleep(1);
 #endif
@@ -1449,11 +1557,13 @@ int PARMCI_Init()
         printf("armci_page_size=%ld\n", armci_page_size);
         printf("armci_is_using_huge_pages=%d\n", armci_is_using_huge_pages);
         printf("malloc_is_using_huge_pages=%d\n", malloc_is_using_huge_pages);
+        printf("DMAPP put threshold=%d\n", l_state.dmapp_put_threshold);
+        printf("DMAPP get threshold=%d\n", l_state.dmapp_get_threshold);
         printf("XPMEM use is %s\n", (armci_uses_shm) ? "ENABLED" : "DISABLED");
         printf("Optimized CPU memcpy is %s\n", (!armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
         printf("armci_use_rem_acc is %s\n", (armci_use_rem_acc) ? "ENABLED" : "DISABLED");
         printf("use acc thread is %s\n", (armci_dmapp_qflags & DMAPP_QUEUE_ASYNC_PROGRESS) ? "ENABLED" : "DISABLED");
-        printf("remote acc threshold %d\n", armci_rem_acc_threshold);
+        printf("remote acc threshold=%d\n", armci_rem_acc_threshold);
     }
 #endif
 
@@ -2142,6 +2252,23 @@ static void check_envs(void)
         l_state.dmapp_get_routing = DMAPP_ROUTING_ADAPTIVE;
     }
 
+    /* ARMCI_DMAPP_[PUT|GET]_THRESHOLD
+     *
+     * TODO description */
+    if ((value = getenv("ARMCI_DMAPP_PUT_THRESHOLD")) != NULL){
+        l_state.dmapp_put_threshold = (atoi(value));
+    }
+    else {
+        l_state.dmapp_put_threshold = ARMCI_DMAPP_PUT_OFFLOAD_THRESHOLD;
+    }
+
+    if ((value = getenv("ARMCI_DMAPP_GET_THRESHOLD")) != NULL){
+        l_state.dmapp_get_threshold = (atoi(value));
+    }
+    else {
+        l_state.dmapp_get_threshold = ARMCI_DMAPP_GET_OFFLOAD_THRESHOLD;
+    }
+
 #if HAVE_DMAPP_LOCK
     if(getenv("ARMCI_DMAPP_LOCK_ON_GET")) {
        use_locks_on_get = atoi(getenv("ARMCI_DMAPP_LOCK_ON_GET"));
@@ -2331,7 +2458,7 @@ static void dmapp_initialize(void)
      * Consider how to best set this threshold. While a threshold increase
      * may increase CPU availability, it may also increase transfer latency
      * due to BTE involvement. */
-    requested_attrs.offload_threshold = ARMCI_DMAPP_OFFLOAD_THRESHOLD;
+    requested_attrs.offload_threshold = l_state.dmapp_put_threshold;
 
     /* Specifies the type of routing to be used. Applies to RMA requests with
      * PUT semantics and all AMOs. The default is DMAPP_ROUTING_ADAPTIVE.
