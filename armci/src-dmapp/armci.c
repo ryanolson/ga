@@ -2287,7 +2287,13 @@ static void check_envs(void)
 
     /* ARMCI_DMAPP_[PUT|GET]_THRESHOLD
      *
-     * TODO description */
+     * Vary the point at which DMAPP switches to using RDMA to
+     * launch Put and Get operations. Value is in bytes.
+     * DMAPP only allows one configuration setting which applies
+     * to both Puts and Gets. But as the parameter is maintained on a
+     * per thread basis, so we can adjust the Get threshold in the
+     * Remote Accumulate helper thread.
+     */
     if ((value = getenv("ARMCI_DMAPP_PUT_THRESHOLD")) != NULL){
         l_state.dmapp_put_threshold = (atoi(value));
     }
@@ -2295,6 +2301,7 @@ static void check_envs(void)
         l_state.dmapp_put_threshold = ARMCI_DMAPP_PUT_OFFLOAD_THRESHOLD;
     }
 
+    /* This threshold is only used in the Remote Acc thread */
     if ((value = getenv("ARMCI_DMAPP_GET_THRESHOLD")) != NULL){
         l_state.dmapp_get_threshold = (atoi(value));
     }
