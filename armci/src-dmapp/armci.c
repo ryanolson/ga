@@ -783,7 +783,7 @@ typedef struct acc_buffer {
 } rem_acc_buffer_t;
 
 #define PIPEDEPTH 16
-#define CHUNK_SIZE_1D (32*1024)
+#define CHUNK_SIZE_1D (64*1024)
 
 static int do_remote_AccS(int datatype, void *scale,
                           void *src_ptr, int src_stride_ar[/*stride_levels*/],
