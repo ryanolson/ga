@@ -2230,23 +2230,56 @@ void ARMCI_Memctl(armci_meminfo_t *meminfo)
 
 /* DMAPP Functions */
 
+static dmapp_routing_type_t convert_routing_code(int rc)
+{
+    dmapp_routing_type_t routing_mode = DMAPP_ROUTING_ADAPTIVE;
+
+        /* Remap cmd line HW RC codes to DMAPP software ones
+           RC   DMAPP name/value
+           0  = DETERMINISTIC (non-min hashed)
+           1  = DETERMINISTIC_1 (min hashed)
+           2  = reserved
+           3  = IN_ORDER (min non-hashed)
+           4  = ADAPTIVE
+           5  = ADAPTIVE_1
+           6  = ADAPTIVE_2
+           7  = ADAPTIVE_3
+        */
+        switch(rc) {
+        case 0: routing_mode=DMAPP_ROUTING_DETERMINISTIC; break;
+        case 1: routing_mode=DMAPP_ROUTING_DETERMINISTIC_1; break;
+        case 3: routing_mode=DMAPP_ROUTING_IN_ORDER; break;
+        case 4: routing_mode=DMAPP_ROUTING_ADAPTIVE; break;
+        case 5: routing_mode=DMAPP_ROUTING_ADAPTIVE_1; break;
+        case 6: routing_mode=DMAPP_ROUTING_ADAPTIVE_2; break;
+        case 7: routing_mode=DMAPP_ROUTING_ADAPTIVE_3; break;
+        default:
+            fprintf(stderr, "Invalid routing control mode: rc=%d\n", rc);
+        }
+
+        return routing_mode;
+}
 
 static void check_envs(void)
 {
     char *value;
 
-    /* ARMCI_DMAPP_[PUT|GET]_ROUTING
+    /* ARMCI_DMAPP_[PUT|GET]_ROUTING=[0 .. 7]
      *
-     * TODO description */
+     * Allow the user to overload the default DMAPP routing modes
+     * for both Put and Get operations.
+     * Default is DMAPP_ROUTING_ADAPTIVE (4)
+     *
+     */
     if ((value = getenv("ARMCI_DMAPP_PUT_ROUTING")) != NULL){
-        l_state.dmapp_put_routing = (atoi(value));
+        l_state.dmapp_put_routing = convert_routing_code(atoi(value));
     }
     else {
         l_state.dmapp_put_routing = DMAPP_ROUTING_ADAPTIVE;
     }
 
     if ((value = getenv("ARMCI_DMAPP_GET_ROUTING")) != NULL){
-        l_state.dmapp_get_routing = (atoi(value));
+        l_state.dmapp_get_routing = convert_routing_code(atoi(value));
     }
     else {
         l_state.dmapp_get_routing = DMAPP_ROUTING_ADAPTIVE;
