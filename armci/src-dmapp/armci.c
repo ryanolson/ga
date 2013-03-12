@@ -5,7 +5,7 @@
 #   include "config.h"
 #endif
 
-#define HAVE_DMAPP_QUEUE 1
+//#define HAVE_DMAPP_QUEUE 1
 
 /* C and/or system headers */
 #include <stdio.h>
@@ -774,6 +774,9 @@ static int do_AccS(int datatype, void *scale,
 }
 
 
+#define PIPEDEPTH     64
+#define CHUNK_SIZE_1D (64*1024)
+
 #if HAVE_DMAPP_QUEUE
 typedef struct acc_buffer {
     long src_idx;
@@ -781,9 +784,6 @@ typedef struct acc_buffer {
     long sizetoget;
     dmapp_syncid_handle_t syncid;
 } rem_acc_buffer_t;
-
-#define PIPEDEPTH     64
-#define CHUNK_SIZE_1D (64*1024)
 
 static int do_remote_AccS(int datatype, void *scale,
                           void *src_ptr, int src_stride_ar[/*stride_levels*/],
@@ -1568,10 +1568,12 @@ int PARMCI_Init()
         printf("DMAPP get threshold=%d\n", l_state.dmapp_get_threshold);
         printf("XPMEM use is %s\n", (armci_uses_shm) ? "ENABLED" : "DISABLED");
         printf("Optimized CPU memcpy is %s\n", (!armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
+#if HAVE_DMAPP_QUEUE
         printf("armci_use_rem_acc is %s\n", (armci_use_rem_acc) ? "ENABLED" : "DISABLED");
         printf("use acc thread is %s\n", (armci_dmapp_qflags & DMAPP_QUEUE_ASYNC_PROGRESS) ? "ENABLED" : "DISABLED");
         printf("contig remote acc threshold=%d\n", armci_rem_acc_contig_threshold);
         printf("strided remote acc threshold=%d\n", armci_rem_acc_strided_threshold);
+#endif
     }
 #endif
 
