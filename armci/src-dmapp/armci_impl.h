@@ -9,8 +9,9 @@
 
 #define ARMCI_DMAPP_PUT_OFFLOAD_THRESHOLD  2048 /* PUT threshold for switch from FMA to RDMA */
 #define ARMCI_DMAPP_GET_OFFLOAD_THRESHOLD  128  /* GET threshold for switch from FMA to RDMA (acc thread only) */
-#define ARMCI_REM_ACC_THRESHOLD            (128*1024) /* threshold for switch to remote ACC thread */
-#define MAX_NB_OUTSTANDING                 1024 /* Limit on the number of outstanding RDMAs */
+#define ARMCI_REM_ACC_CONTIG_THRESHOLD     (128*1024) /* contig/1d threshold for switch to remote ACC thread */
+#define ARMCI_REM_ACC_STRIDED_THRESHOLD    256  /* strided threshold for switch to remote ACC thread */
+#define MAX_NB_OUTSTANDING                 4096 /* Limit on the number of outstanding RDMAs */
 
 extern void armci_init_clusinfo(void);
 

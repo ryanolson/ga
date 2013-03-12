@@ -48,7 +48,8 @@ static int use_locks_on_put = 0;
 
 #if HAVE_DMAPP_QUEUE
 static int armci_use_rem_acc = HAVE_DMAPP_QUEUE;
-static long armci_rem_acc_threshold = ARMCI_REM_ACC_THRESHOLD;
+static long armci_rem_acc_contig_threshold = ARMCI_REM_ACC_CONTIG_THRESHOLD;
+static long armci_rem_acc_strided_threshold = ARMCI_REM_ACC_STRIDED_THRESHOLD;
 dmapp_queue_handle_t  armci_queue_hndl;
 static uint32_t armci_dmapp_qdepth = DMAPP_QUEUE_DEFAULT_DEPTH;
 static uint32_t armci_dmapp_qnelems = DMAPP_QUEUE_DEFAULT_NELEMS;
@@ -775,7 +776,6 @@ static int do_AccS(int datatype, void *scale,
 
 #if HAVE_DMAPP_QUEUE
 typedef struct acc_buffer {
-    char *get_buf;
     long src_idx;
     long dst_idx;
     long sizetoget;
@@ -798,7 +798,7 @@ static int do_remote_AccS(int datatype, void *scale,
     int dst_bvalue[7], dst_bunit[7];
     int dmapp_status = DMAPP_RC_SUCCESS;
     int sizetoget;
-    char *get_buf[PIPEDEPTH];
+    char *get_buf;
     long k = 0;
     dmapp_return_t status;
     rem_acc_buffer_t *rem_acc_buf;
@@ -820,9 +820,6 @@ static int do_remote_AccS(int datatype, void *scale,
         buffered_1d = 1;
     }
 
-    rem_acc_buf = malloc(n1dim*sizeof(rem_acc_buffer_t));
-    assert(rem_acc_buf);
-
     pipedepth = ARMCI_MIN(n1dim, PIPEDEPTH);
 
 #if 0
@@ -832,15 +829,16 @@ static int do_remote_AccS(int datatype, void *scale,
 
     if(sizetoget*pipedepth <= l_state.acc_buf_len) {
         // use pre-allocated buffer
-        get_buf[0] = l_state.acc_buf;
+        get_buf = l_state.acc_buf;
     }
     else {
         // allocate the temporary buffers
-        get_buf[0] = (char *)my_malloc(sizetoget * pipedepth);
+        get_buf = (char *)my_malloc(sizetoget * pipedepth);
         assert(get_buf);
     }
-    for(i = 1; i < pipedepth; i++)
-        get_buf[i] = get_buf[i-1] + sizetoget;
+
+    rem_acc_buf = malloc(n1dim*sizeof(rem_acc_buffer_t));
+    assert(rem_acc_buf);
 
     /* calculate the destination indices */
     src_bvalue[0] = 0; src_bvalue[1] = 0; src_bunit[0] = 1; src_bunit[1] = 1;
@@ -879,15 +877,18 @@ static int do_remote_AccS(int datatype, void *scale,
         }
 
         if(buffered_1d) {
-           dst_idx = src_idx = i*CHUNK_SIZE_1D;
-           // on last iteration resize sizetoget
-           if(i+1 == n1dim) sizetoget = count[0] - (i*CHUNK_SIZE_1D);
+            rem_acc_buf[i].src_idx = rem_acc_buf[i].dst_idx = i*CHUNK_SIZE_1D;
+            if(i+1 == n1dim)
+                // on last iteration resize sizetoget
+                rem_acc_buf[i].sizetoget = count[0] - (i*CHUNK_SIZE_1D);
+            else
+                rem_acc_buf[i].sizetoget = sizetoget;
         }
-
-        rem_acc_buf[i].get_buf = get_buf[i%pipedepth];
-        rem_acc_buf[i].src_idx = src_idx;
-        rem_acc_buf[i].dst_idx = dst_idx;
-        rem_acc_buf[i].sizetoget = sizetoget;
+        else {
+            rem_acc_buf[i].src_idx = src_idx;
+            rem_acc_buf[i].dst_idx = dst_idx;
+            rem_acc_buf[i].sizetoget = sizetoget;
+        }
     }
 
     // grab the atomic lock (in our rank)
@@ -898,26 +899,28 @@ static int do_remote_AccS(int datatype, void *scale,
         rem_acc_buffer_t *curr = &rem_acc_buf[i];
 
         /* Issue async Get in to a temp buffer */
-        status = dmapp_get_nb(curr->get_buf, (char *)src_ptr + curr->src_idx, src_seg, proc,
+        status = dmapp_get_nb(get_buf + (i*sizetoget),
+                              (char *)src_ptr + curr->src_idx, src_seg, proc,
                               curr->sizetoget/sizeof(long), DMAPP_QW, &curr->syncid);
         assert(status == DMAPP_RC_SUCCESS);
     }
 
     for(i = 0; i < n1dim; i++) {
         rem_acc_buffer_t *curr = &rem_acc_buf[i];
+        char *buf = get_buf + ((i % pipedepth) * sizetoget);
 
         /* Wait for the previous async Get */
         status = dmapp_syncid_wait(&curr->syncid);
         assert(status == DMAPP_RC_SUCCESS);
 
         /* Now perform the Accumulate operation leaving the result in dst buf */
-        do_acc(curr->get_buf, (char *)dst_ptr + curr->dst_idx, datatype, scale, curr->sizetoget);
+        do_acc(buf, (char *)dst_ptr + curr->dst_idx, datatype, scale, curr->sizetoget);
 
         if (i+pipedepth < n1dim) {
             rem_acc_buffer_t *next = &rem_acc_buf[i+pipedepth];
 
             /* Issue the next async Get in to a temp buffer */
-            status = dmapp_get_nb(next->get_buf, (char *)src_ptr + next->src_idx, src_seg, proc,
+            status = dmapp_get_nb(buf, (char *)src_ptr + next->src_idx, src_seg, proc,
                                   next->sizetoget/sizeof(long), DMAPP_QW, &next->syncid);
             assert(status == DMAPP_RC_SUCCESS);
         }
@@ -930,8 +933,8 @@ static int do_remote_AccS(int datatype, void *scale,
     parmci_notify(proc);
 
     // free temp buffer
-    if (get_buf[0] != l_state.acc_buf)
-        my_free(get_buf[0]);
+    if (get_buf != l_state.acc_buf)
+        my_free(get_buf);
 
     free(rem_acc_buf);
 
@@ -1014,7 +1017,7 @@ static int armci_queue_cb(void *context, void *data, uint32_t len, dmapp_pe_t ra
 }
 
 /* Attempt to perform the Remote ACC using a helper thread
- * Returns -1 if this is not possible
+ * Returns -1 if this is not possible or inefficient
  */
 static int send_remote_AccS(int datatype, void *scale,
                             void *src_ptr, int src_stride_ar[/*stride_levels*/],
@@ -1028,8 +1031,9 @@ static int send_remote_AccS(int datatype, void *scale,
 
     for(i=0, bytes=1; i<=stride_levels;i++) bytes*=count[i];
 
-    /* Test whether we should use the Remote ACC thread */
-    if (bytes < armci_rem_acc_threshold)
+    /* Test whether we should use the Remote ACC thread or not */
+    if ((stride_levels == 0 && bytes < armci_rem_acc_contig_threshold) ||
+        bytes < armci_rem_acc_strided_threshold)
         return -1;
 
     /* The local buffer must be network accessible for Remote ACC to work */
@@ -1563,7 +1567,8 @@ int PARMCI_Init()
         printf("Optimized CPU memcpy is %s\n", (!armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
         printf("armci_use_rem_acc is %s\n", (armci_use_rem_acc) ? "ENABLED" : "DISABLED");
         printf("use acc thread is %s\n", (armci_dmapp_qflags & DMAPP_QUEUE_ASYNC_PROGRESS) ? "ENABLED" : "DISABLED");
-        printf("remote acc threshold=%d\n", armci_rem_acc_threshold);
+        printf("contig remote acc threshold=%d\n", armci_rem_acc_contig_threshold);
+        printf("strided remote acc threshold=%d\n", armci_rem_acc_strided_threshold);
     }
 #endif
 
@@ -2434,6 +2439,11 @@ static void check_envs(void)
 
 #if HAVE_DMAPP_QUEUE
     /* DMAPP Queue API support */
+
+    /* Enable/disable the Remote Accumulate feature
+     *
+     * ARMCI_USE_REM_ACC=[y|n]
+     */
     if ((value = getenv("ARMCI_USE_REM_ACC")) != NULL) {
         if (0 == strncasecmp(value, "y", 1)) {
             armci_use_rem_acc = 1;
@@ -2443,6 +2453,13 @@ static void check_envs(void)
         }
     }
 
+    /* Enable/disable use of a remote accumulate thread
+     *
+     * ARMCI_USE_ACC_THREAD=[y|n]
+     *
+     * TODO: Currently a remote thread *MUST* be used due to
+     * the DMAPP progress engine not being called
+     */
     if ((value = getenv("ARMCI_USE_ACC_THREAD")) != NULL) {
         if (0 == strncasecmp(value, "y", 1)) {
             armci_dmapp_qflags |= DMAPP_QUEUE_ASYNC_PROGRESS;
@@ -2452,8 +2469,18 @@ static void check_envs(void)
         }
     }
 
-    if ((value = getenv("ARMCI_REM_ACC_THRESHOLD")) != NULL) {
-        armci_rem_acc_threshold = atoi(value);
+    /* Set the threshold for using the Remote accumulate feature
+     *
+     * ARMCI_REM_ACC_[CONTIG|STRIDED]_THRESHOLD=<bytes>
+     *
+     * Separate byte thresholds are used for the Contiguous/1D and
+     * Strided calls.
+     */
+    if ((value = getenv("ARMCI_REM_ACC_CONTIG_THRESHOLD")) != NULL) {
+        armci_rem_acc_contig_threshold = atoi(value);
+    }
+    if ((value = getenv("ARMCI_REM_ACC_STRIDED_THRESHOLD")) != NULL) {
+        armci_rem_acc_strided_threshold = atoi(value);
     }
 #endif
 
@@ -2481,8 +2508,8 @@ static void dmapp_initialize(void)
      * Users can experiment with the value to find the optimal setting for
      * their application. */
     requested_attrs.max_outstanding_nb = MAX_NB_OUTSTANDING;
-    assert(MAX_NB_OUTSTANDING > DMAPP_MIN_OUTSTANDING_NB);
-    assert(MAX_NB_OUTSTANDING < DMAPP_MAX_OUTSTANDING_NB);
+    assert(MAX_NB_OUTSTANDING >= DMAPP_MIN_OUTSTANDING_NB);
+    assert(MAX_NB_OUTSTANDING <= DMAPP_MAX_OUTSTANDING_NB);
     if (0 == l_state.rank) {
         if (MAX_NB_OUTSTANDING != DMAPP_DEF_OUTSTANDING_NB) {
             printf("MAX_NB_OUTSTANDING=%u != DMAPP_DEF_OUTSTANDING_NB=%u\n",
