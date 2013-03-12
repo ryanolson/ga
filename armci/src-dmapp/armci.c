@@ -782,7 +782,7 @@ typedef struct acc_buffer {
     dmapp_syncid_handle_t syncid;
 } rem_acc_buffer_t;
 
-#define PIPEDEPTH 16
+#define PIPEDEPTH     64
 #define CHUNK_SIZE_1D (64*1024)
 
 static int do_remote_AccS(int datatype, void *scale,
@@ -837,6 +837,9 @@ static int do_remote_AccS(int datatype, void *scale,
         assert(get_buf);
     }
 
+    /* allocate an array which stores the calculated src_idx/dst_idx so
+     * we can pre-fetch the data and overlap communications with the accumulate
+     */
     rem_acc_buf = malloc(n1dim*sizeof(rem_acc_buffer_t));
     assert(rem_acc_buf);
 
@@ -1420,7 +1423,7 @@ static void dmapp_alloc_buf(void)
     // FAILURE_BUFSIZE should be some multiple of our page size?
     //l_state.acc_buf_len = FAILURE_BUFSIZE;
 //    l_state.acc_buf_len = armci_page_size;
-    l_state.acc_buf_len = ARMCI_MAX((armci_page_size), (8*1024*1024));
+    l_state.acc_buf_len = ARMCI_MAX((armci_page_size), PIPEDEPTH*CHUNK_SIZE_1D);
     l_state.acc_buf = PARMCI_Malloc_local( l_state.acc_buf_len);
     assert(l_state.acc_buf);
 
