@@ -774,7 +774,7 @@ static int do_AccS(int datatype, void *scale,
 }
 
 
-#define PIPEDEPTH     64
+#define PIPEDEPTH     128
 #define CHUNK_SIZE_1D (64*1024)
 
 #if HAVE_DMAPP_QUEUE
@@ -821,11 +821,6 @@ static int do_remote_AccS(int datatype, void *scale,
     }
 
     pipedepth = ARMCI_MIN(n1dim, PIPEDEPTH);
-
-#if 0
-    printf("%d: n1dim %d count[0] %d sizetoget %d stride_levels %d pipedepth %d buffered_1d %d\n",
-           l_state.rank, n1dim, count[0], sizetoget, stride_levels, pipedepth, buffered_1d);
-#endif
 
     if(sizetoget*pipedepth <= l_state.acc_buf_len) {
         // use pre-allocated buffer
@@ -897,6 +892,11 @@ static int do_remote_AccS(int datatype, void *scale,
     // grab the atomic lock (in our rank)
     dmapp_network_lock(l_state.rank);
 
+#if 0
+    printf("%d.%d: REM_ACC: n1dim %d count[0] %d sizetoget %d stride_levels %d pipedepth %d buffered_1d %d\n",
+           l_state.rank, proc, n1dim, count[0], sizetoget, stride_levels, pipedepth, buffered_1d);
+#endif
+
     /* Fill the async Get pipe */
     for(i = 0; i < pipedepth; i++) {
         rem_acc_buffer_t *curr = &rem_acc_buf[i];
@@ -904,7 +904,7 @@ static int do_remote_AccS(int datatype, void *scale,
         /* Issue async Get in to a temp buffer */
         status = dmapp_get_nb(get_buf + (i*sizetoget),
                               (char *)src_ptr + curr->src_idx, src_seg, proc,
-                              curr->sizetoget/sizeof(long), DMAPP_QW, &curr->syncid);
+                              curr->sizetoget/4, DMAPP_DW, &curr->syncid);
         assert(status == DMAPP_RC_SUCCESS);
     }
 
@@ -924,7 +924,7 @@ static int do_remote_AccS(int datatype, void *scale,
 
             /* Issue the next async Get in to a temp buffer */
             status = dmapp_get_nb(buf, (char *)src_ptr + next->src_idx, src_seg, proc,
-                                  next->sizetoget/sizeof(long), DMAPP_QW, &next->syncid);
+                                  next->sizetoget/4, DMAPP_DW, &next->syncid);
             assert(status == DMAPP_RC_SUCCESS);
         }
     }
@@ -1049,7 +1049,7 @@ static int send_remote_AccS(int datatype, void *scale,
            l_state.rank, count[0], bytes, stride_levels, proc);
 #endif
 
-    hdrsize = (2*sizeof(void*) /* src_ptr + dst-ptr */ +
+    hdrsize = (2*sizeof(void*) /* src_ptr + dst_ptr */ +
                sizeof(dmapp_seg_desc_t) /* src seg desc */ +
                2*sizeof(int)  /* stride_levels + datatype */ +
                2*sizeof(int)*stride_levels /* src_stride_ar[] + dst_stride_ar[] */ +
