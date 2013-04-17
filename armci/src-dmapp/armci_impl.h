@@ -70,6 +70,8 @@ typedef struct {
     int put_buf_len;
     void *get_buf;
     int get_buf_len;
+    void *rem_acc_buf;
+    int rem_acc_buf_len;
 
     /* envs */
     int dmapp_put_routing;

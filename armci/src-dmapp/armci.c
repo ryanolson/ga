@@ -39,9 +39,9 @@
 // ARMCI_MAX_LOCKS mirrors the default DMAPP_MAX_LOCKS limit
 // Larger values of ARMCI_MAX_LOCKS will require DMAPP_MAX_LOCKS be set at runtime.
 // DMAPP_MAX_LOCKS has a maxium value of 1023
-#define ARMCI_MAX_LOCKS 128  
-static dmapp_lock_desc_t   lock_desc[ARMCI_MAX_LOCKS];
-static dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS];
+#define ARMCI_MAX_LOCKS 128
+static dmapp_lock_desc_t lock_desc[ARMCI_MAX_LOCKS];
+__thread dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS];
 static int use_locks_on_get = 0;
 static int use_locks_on_put = 0;
 #endif
@@ -387,7 +387,8 @@ static void dmapp_network_lock(int proc)
     int dmapp_status;
 
 #if HAVE_DMAPP_LOCK
-    dmapp_lock_acquire( &lock_desc[0], &(l_state.job.data_seg), proc, 0, &lock_handle[0]);
+    dmapp_status = dmapp_lock_acquire( &lock_desc[0], &(l_state.job.data_seg), proc, 0, &lock_handle[0]);
+    assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
     reg_entry_t *dst_reg= reg_cache_find(proc, 
             l_state.atomic_lock_buf[proc], sizeof(long));
@@ -412,7 +413,8 @@ static void dmapp_network_unlock(int proc)
     int dmapp_status;
 
 # if HAVE_DMAPP_LOCK
-    dmapp_lock_release( lock_handle[0], 0 );
+    dmapp_status = dmapp_lock_release( lock_handle[0], 0 );
+    assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
     reg_entry_t *dst_reg= reg_cache_find(proc, 
             l_state.atomic_lock_buf[proc], sizeof(long));
@@ -767,7 +769,7 @@ static int do_AccS(int datatype, void *scale,
     if (!armci_uses_shm || !ARMCI_Same_node(proc))
 #endif
         // free temp buffer
-        if (get_buf && sizetogetput > l_state.acc_buf_len)
+        if (get_buf != l_state.acc_buf)
             my_free(get_buf);
 
     return 0;
@@ -783,7 +785,7 @@ typedef struct acc_buffer {
     long dst_idx;
     long sizetoget;
     dmapp_syncid_handle_t syncid;
-} rem_acc_buffer_t;
+} rem_acc_desc_t;
 
 static int do_remote_AccS(int datatype, void *scale,
                           void *src_ptr, int src_stride_ar[/*stride_levels*/],
@@ -801,7 +803,7 @@ static int do_remote_AccS(int datatype, void *scale,
     char *get_buf;
     long k = 0;
     dmapp_return_t status;
-    rem_acc_buffer_t *rem_acc_buf;
+    rem_acc_desc_t *rem_acc_desc;
     int pipedepth;
     int buffered_1d = 0;
 
@@ -822,9 +824,9 @@ static int do_remote_AccS(int datatype, void *scale,
 
     pipedepth = ARMCI_MIN(n1dim, PIPEDEPTH);
 
-    if(sizetoget*pipedepth <= l_state.acc_buf_len) {
+    if((sizetoget*pipedepth <= l_state.rem_acc_buf_len)) {
         // use pre-allocated buffer
-        get_buf = l_state.acc_buf;
+        get_buf = l_state.rem_acc_buf;
     }
     else {
         // allocate the temporary buffers
@@ -835,8 +837,8 @@ static int do_remote_AccS(int datatype, void *scale,
     /* allocate an array which stores the calculated src_idx/dst_idx so
      * we can pre-fetch the data and overlap communications with the accumulate
      */
-    rem_acc_buf = malloc(n1dim*sizeof(rem_acc_buffer_t));
-    assert(rem_acc_buf);
+    rem_acc_desc = malloc(n1dim*sizeof(rem_acc_desc_t));
+    assert(rem_acc_desc);
 
     /* calculate the destination indices */
     src_bvalue[0] = 0; src_bvalue[1] = 0; src_bunit[0] = 1; src_bunit[1] = 1;
@@ -875,17 +877,17 @@ static int do_remote_AccS(int datatype, void *scale,
         }
 
         if(buffered_1d) {
-            rem_acc_buf[i].src_idx = rem_acc_buf[i].dst_idx = i*CHUNK_SIZE_1D;
+            rem_acc_desc[i].src_idx = rem_acc_desc[i].dst_idx = i*CHUNK_SIZE_1D;
             if(i+1 == n1dim)
                 // on last iteration resize sizetoget
-                rem_acc_buf[i].sizetoget = count[0] - (i*CHUNK_SIZE_1D);
+                rem_acc_desc[i].sizetoget = count[0] - (i*CHUNK_SIZE_1D);
             else
-                rem_acc_buf[i].sizetoget = sizetoget;
+                rem_acc_desc[i].sizetoget = sizetoget;
         }
         else {
-            rem_acc_buf[i].src_idx = src_idx;
-            rem_acc_buf[i].dst_idx = dst_idx;
-            rem_acc_buf[i].sizetoget = sizetoget;
+            rem_acc_desc[i].src_idx = src_idx;
+            rem_acc_desc[i].dst_idx = dst_idx;
+            rem_acc_desc[i].sizetoget = sizetoget;
         }
     }
 
@@ -899,7 +901,7 @@ static int do_remote_AccS(int datatype, void *scale,
 
     /* Fill the async Get pipe */
     for(i = 0; i < pipedepth; i++) {
-        rem_acc_buffer_t *curr = &rem_acc_buf[i];
+        rem_acc_desc_t *curr = &rem_acc_desc[i];
 
         /* Issue async Get in to a temp buffer */
         status = dmapp_get_nb(get_buf + (i*sizetoget),
@@ -909,7 +911,7 @@ static int do_remote_AccS(int datatype, void *scale,
     }
 
     for(i = 0; i < n1dim; i++) {
-        rem_acc_buffer_t *curr = &rem_acc_buf[i];
+        rem_acc_desc_t *curr = &rem_acc_desc[i];
         char *buf = get_buf + ((i % pipedepth) * sizetoget);
 
         /* Wait for the previous async Get */
@@ -920,7 +922,7 @@ static int do_remote_AccS(int datatype, void *scale,
         do_acc(buf, (char *)dst_ptr + curr->dst_idx, datatype, scale, curr->sizetoget);
 
         if (i+pipedepth < n1dim) {
-            rem_acc_buffer_t *next = &rem_acc_buf[i+pipedepth];
+            rem_acc_desc_t *next = &rem_acc_desc[i+pipedepth];
 
             /* Issue the next async Get in to a temp buffer */
             status = dmapp_get_nb(buf, (char *)src_ptr + next->src_idx, src_seg, proc,
@@ -936,10 +938,10 @@ static int do_remote_AccS(int datatype, void *scale,
     parmci_notify(proc);
 
     // free temp buffer
-    if (get_buf != l_state.acc_buf)
+    if (get_buf != l_state.rem_acc_buf)
         my_free(get_buf);
 
-    free(rem_acc_buf);
+    free(rem_acc_desc);
 
     return 0;
 }
@@ -1422,10 +1424,12 @@ static void dmapp_alloc_buf(void)
 {
     // FAILURE_BUFSIZE should be some multiple of our page size?
     //l_state.acc_buf_len = FAILURE_BUFSIZE;
-//    l_state.acc_buf_len = armci_page_size;
-    l_state.acc_buf_len = ARMCI_MAX((armci_page_size), PIPEDEPTH*CHUNK_SIZE_1D);
+    l_state.acc_buf_len = armci_page_size;
     l_state.acc_buf = PARMCI_Malloc_local( l_state.acc_buf_len);
     assert(l_state.acc_buf);
+    l_state.rem_acc_buf_len = ARMCI_MAX((armci_page_size), PIPEDEPTH*CHUNK_SIZE_1D);
+    l_state.rem_acc_buf = PARMCI_Malloc_local( l_state.rem_acc_buf_len);
+    assert(l_state.rem_acc_buf);
 
     //l_state.put_buf_len = FAILURE_BUFSIZE;
     l_state.put_buf_len = armci_page_size;
