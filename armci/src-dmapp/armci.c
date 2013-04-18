@@ -47,6 +47,17 @@ static int use_locks_on_put = 0;
 #endif
 
 #if HAVE_DMAPP_QUEUE
+/* Declare the DMAPP Queue API functions weak in case we run on a system without the latest library */
+extern dmapp_return_t
+dmapp_queue_attach(int (*queue_cb)(void *context, void *data, uint32_t len, dmapp_pe_t rank),
+		   void *context, uint64_t flags, dmapp_queue_handle_t *queue_hndl)  __attribute__((weak));
+extern dmapp_return_t dmapp_queue_detach(dmapp_queue_handle_t queue_hndl, uint64_t flags) __attribute__((weak));
+extern dmapp_return_t dmapp_queue_put(dmapp_queue_handle_t  queue_hndl, void *source, uint64_t nelems,
+                                      dmapp_type_t type, dmapp_pe_t target_pe, uint64_t flags) __attribute__((weak));
+#pragma weak dmapp_queue_attach
+#pragma weak dmapp_queue_detach
+#pragma weak dmapp_queue_put
+
 static int armci_use_rem_acc = HAVE_DMAPP_QUEUE;
 static long armci_rem_acc_contig_threshold = ARMCI_REM_ACC_CONTIG_THRESHOLD;
 static long armci_rem_acc_strided_threshold = ARMCI_REM_ACC_STRIDED_THRESHOLD;
@@ -1548,8 +1559,9 @@ int PARMCI_Init()
     create_dmapp_locks();
 
 #if HAVE_DMAPP_QUEUE
-    // Create DMAPP queue
-    create_dmapp_queue();
+    if (armci_use_rem_acc)
+        // Create DMAPP queue
+        create_dmapp_queue();
 #endif
 
     armci_notify_init();
@@ -1574,9 +1586,10 @@ int PARMCI_Init()
         printf("Optimized CPU memcpy is %s\n", (!armci_use_system_memcpy) ? "ENABLED" : "DISABLED");
 #if HAVE_DMAPP_QUEUE
         printf("armci_use_rem_acc is %s\n", (armci_use_rem_acc) ? "ENABLED" : "DISABLED");
-        printf("use acc thread is %s\n", (armci_dmapp_qflags & DMAPP_QUEUE_ASYNC_PROGRESS) ? "ENABLED" : "DISABLED");
-        printf("contig remote acc threshold=%d\n", armci_rem_acc_contig_threshold);
-        printf("strided remote acc threshold=%d\n", armci_rem_acc_strided_threshold);
+        if (armci_use_rem_acc) {
+            printf("contig remote acc threshold=%d\n", armci_rem_acc_contig_threshold);
+            printf("strided remote acc threshold=%d\n", armci_rem_acc_strided_threshold);
+        }
 #endif
     }
 #endif
@@ -1859,10 +1872,6 @@ int parmci_notify_wait(int proc,int *pval)
      while( pnotify->waited > pnotify->received) {
          if(++loop == 1000) { loop=0;cpu_yield(); }
          armci_util_spin(loop, pnotify);
-#if HAVE_DMAPP_QUEUE
-         if (!(armci_dmapp_qflags & DMAPP_QUEUE_ASYNC_PROGRESS))
-             dmapp_progress();
-#endif
      }
      *pval = pnotify->waited;
      retval=pnotify->received;
@@ -2461,22 +2470,9 @@ static void check_envs(void)
             armci_use_rem_acc = 0;
         }
     }
-
-    /* Enable/disable use of a remote accumulate thread
-     *
-     * ARMCI_USE_ACC_THREAD=[y|n]
-     *
-     * TODO: Currently a remote thread *MUST* be used due to
-     * the DMAPP progress engine not being called
-     */
-    if ((value = getenv("ARMCI_USE_ACC_THREAD")) != NULL) {
-        if (0 == strncasecmp(value, "y", 1)) {
-            armci_dmapp_qflags |= DMAPP_QUEUE_ASYNC_PROGRESS;
-        }
-        else if (0 == strncasecmp(value, "n", 1)) {
-            armci_dmapp_qflags &= ~DMAPP_QUEUE_ASYNC_PROGRESS;
-        }
-    }
+    /* Check for availability of DMAPP Queue API at compile/runtime */
+    if (dmapp_queue_attach == NULL)
+            armci_use_rem_acc = 0;
 
     /* Set the threshold for using the Remote accumulate feature
      *
