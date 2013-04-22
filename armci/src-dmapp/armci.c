@@ -35,6 +35,10 @@
 #define ARMCI_MAX(a,b) (((a)>(b))?(a):(b))
 #define ARMCI_MIN(a,b) (((a)<(b))?(a):(b))
 
+#define ONEK    (1024UL)
+#define FOURK   (4*ONEK)
+#define ONEMEG  (ONEK*ONEK)
+
 #if HAVE_DMAPP_LOCK
 // ARMCI_MAX_LOCKS mirrors the default DMAPP_MAX_LOCKS limit
 // Larger values of ARMCI_MAX_LOCKS will require DMAPP_MAX_LOCKS be set at runtime.
@@ -788,7 +792,7 @@ static int do_AccS(int datatype, void *scale,
 
 
 #define PIPEDEPTH     128
-#define CHUNK_SIZE_1D (64*1024)
+#define CHUNK_SIZE_1D (64*ONEK)
 
 #if HAVE_DMAPP_QUEUE
 typedef struct acc_buffer {
@@ -2397,24 +2401,36 @@ static void check_envs(void)
      * we look for this value in case it is specified and we want to allocate
      * memory aligned to the same page size */
     if ((value = getenv("HUGETLB_DEFAULT_PAGE_SIZE")) != NULL){
-        /* must be one of [128K|512K|2M|8M|16M|64M] */
+        /* must be one of [128K|512K|2M|4M|8M|16M|32M|64M|128M|256M] */
         if (0 == strncasecmp(value, "128K", 4)) {
-            hugetlb_default_page_size = 131072;
+            hugetlb_default_page_size = 128*ONEK;
         }
         else if (0 == strncasecmp(value, "512K", 4)) {
-            hugetlb_default_page_size = 524288;
+            hugetlb_default_page_size = 512*ONEK;
         }
         else if (0 == strncasecmp(value, "2M", 2)) {
-            hugetlb_default_page_size = 2097152;
+            hugetlb_default_page_size = 2*ONEMEG;
+        }
+        else if (0 == strncasecmp(value, "4M", 2)) {
+            hugetlb_default_page_size = 4*ONEMEG;
         }
         else if (0 == strncasecmp(value, "8M", 2)) {
-            hugetlb_default_page_size = 8388608;
+            hugetlb_default_page_size = 8*ONEMEG;
         }
         else if (0 == strncasecmp(value, "16M", 3)) {
-            hugetlb_default_page_size = 16777216;
+            hugetlb_default_page_size = 16*ONEMEG;
+        }
+        else if (0 == strncasecmp(value, "32M", 3)) {
+            hugetlb_default_page_size = 32*ONEMEG;
         }
         else if (0 == strncasecmp(value, "64M", 3)) {
-            hugetlb_default_page_size = 67108864;
+            hugetlb_default_page_size = 64*ONEMEG;
+        }
+        else if (0 == strncasecmp(value, "128M", 4)) {
+            hugetlb_default_page_size = 128*ONEMEG;
+        }
+        else if (0 == strncasecmp(value, "256M", 4)) {
+            hugetlb_default_page_size = 256*ONEMEG;
         }
         else {
             assert(0);
