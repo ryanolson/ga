@@ -1433,6 +1433,17 @@ static void create_dmapp_queue(void)
         assert(0);
     }
 }
+
+static void destroy_dmapp_queue(void)
+{
+    dmapp_return_t status;
+
+    status = dmapp_queue_detach(armci_queue_hndl, 0);
+    if (status != DMAPP_RC_SUCCESS) {
+        fprintf(stderr,"\n dmapp_queue_detach FAILED: %d\n", status);
+        assert(0);
+    }
+}
 #endif
 
 static void dmapp_alloc_buf(void)
@@ -2636,12 +2647,18 @@ static void dmapp_terminate(void)
 {
     int status;
 
+#if HAVE_DMAPP_QUEUE
+    if (armci_use_rem_acc)
+        // Destroy DMAPP queue
+        destroy_dmapp_queue();
+#endif
+
     destroy_dmapp_locks();
-   
+
     dmapp_free_buf();
 
-    reg_cache_destroy(l_state.size); 
-    
+    reg_cache_destroy(l_state.size);
+
     status = dmapp_finalize();
     assert(status == DMAPP_RC_SUCCESS);
 
