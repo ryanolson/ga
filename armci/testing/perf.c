@@ -15,8 +15,8 @@ static int size[] = {2,4,8,16,32,64,128,256,512,1024,0}; /* 0 is sentinal */
 
 #define MAX_MESSAGE_SIZE 16*1024*1024
 #define MEDIUM_MESSAGE_SIZE 8192
-#define ITER_SMALL 1000
-#define ITER_LARGE 100
+#define ITER_SMALL 10000
+#define ITER_LARGE 1000
 
 #define WARMUP 10
 static void fill_array(double *arr, int count, int which);

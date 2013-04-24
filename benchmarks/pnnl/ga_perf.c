@@ -225,7 +225,7 @@ void test_1D()
       double latency_get, latency_put, latency_acc;
       double bandwidth_get, bandwidth_put, bandwidth_acc;
 
-      loop = (SIZE * SIZE) / (chunk[i] * chunk[i]);
+      loop = (SIZE * SIZE * SIZE) / (chunk[i] * chunk[i]);
       loop = (int)sqrt((double)loop);
       if (loop < 2) {
         loop = 2;
@@ -326,7 +326,7 @@ void test_2D()
       double latency_get, latency_put, latency_acc;
       double bandwidth_get, bandwidth_put, bandwidth_acc;
 
-      loop = (SIZE * SIZE) / (chunk[i] * chunk[i]);
+      loop = (SIZE * SIZE * SIZE) / (chunk[i] * chunk[i]);
       loop = (int)sqrt((double)loop);
       if (loop < 2) {
         loop = 2;

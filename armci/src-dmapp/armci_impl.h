@@ -7,8 +7,11 @@
 #include <xpmem.h>
 #endif
 
-#define ARMCI_DMAPP_OFFLOAD_THRESHOLD 2048
-#define MAX_NB_OUTSTANDING 1024
+#define ARMCI_DMAPP_PUT_OFFLOAD_THRESHOLD  2048 /* PUT threshold for switch from FMA to RDMA */
+#define ARMCI_DMAPP_GET_OFFLOAD_THRESHOLD  128  /* GET threshold for switch from FMA to RDMA (acc thread only) */
+#define ARMCI_REM_ACC_CONTIG_THRESHOLD     (144*1024) /* contig/1d threshold for switch to remote ACC thread */
+#define ARMCI_REM_ACC_STRIDED_THRESHOLD    256  /* strided threshold for switch to remote ACC thread */
+#define MAX_NB_OUTSTANDING                 1024 /* Limit on the number of outstanding RDMAs */
 
 extern void armci_init_clusinfo(void);
 
@@ -67,10 +70,14 @@ typedef struct {
     int put_buf_len;
     void *get_buf;
     int get_buf_len;
+    void *rem_acc_buf;
+    int rem_acc_buf_len;
 
     /* envs */
     int dmapp_put_routing;
     int dmapp_get_routing;
+    int dmapp_put_threshold;
+    int dmapp_get_threshold;
 } local_state;
 
 extern local_state l_state;

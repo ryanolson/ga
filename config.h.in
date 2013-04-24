@@ -162,6 +162,9 @@
 /* Define to 1 if you have the `dmapp_lock' enabled library. */
 #undef HAVE_DMAPP_LOCK
 
+/* Define to 1 if you have the `dmapp_queue' enabled library. */
+#undef HAVE_DMAPP_QUEUE
+
 /* Define to 1 if you have the `dtime' function. */
 #undef HAVE_DTIME
 

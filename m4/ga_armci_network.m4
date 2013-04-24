@@ -262,6 +262,12 @@ AS_IF([test "x$happy" = xyes],
         [AC_DEFINE([HAVE_DMAPP_LOCK], [0],
                [Define to 1 if you have the `dmapp_lock' enabled library.])])])
 AS_IF([test "x$happy" = xyes],
+    [AC_SEARCH_LIBS([dmapp_queue_attach], [dmapp],
+        [AC_DEFINE([HAVE_DMAPP_QUEUE], [1],
+               [Define to 1 if you have the `dmapp_queue' enabled library.])],
+        [AC_DEFINE([HAVE_DMAPP_QUEUE], [0],
+               [Define to 1 if you have the `dmapp_queue' enabled library.])])])
+AS_IF([test "x$happy" = xyes],
     [AC_SEARCH_LIBS([gethugepagesize], [hugetlbfs],
         [AC_DEFINE([HAVE_LIBHUGETLBFS], [1],
                [Define to 1 if you have the `hugetlbfs' library.])],
