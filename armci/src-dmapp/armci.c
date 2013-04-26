@@ -47,9 +47,10 @@
 // ARMCI_MAX_LOCKS mirrors the default DMAPP_MAX_LOCKS limit
 // Larger values of ARMCI_MAX_LOCKS will require DMAPP_MAX_LOCKS be set at runtime.
 // DMAPP_MAX_LOCKS has a maxium value of 1023
+// Declare an extra lock (ARMCI_MAX_LOCKS) for the use_locks_on_[get|put] case
 #define ARMCI_MAX_LOCKS 128
-static dmapp_lock_desc_t lock_desc[ARMCI_MAX_LOCKS];
-__thread dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS];
+static dmapp_lock_desc_t lock_desc[ARMCI_MAX_LOCKS+1];
+__thread dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS+1];
 static int use_locks_on_get = 0;
 static int use_locks_on_put = 0;
 static int use_external_locks = 0;
@@ -409,7 +410,7 @@ void PARMCI_Lock(int mutex, int proc)
 {
 #if HAVE_DMAPP_LOCK
     int dmapp_status;
-    if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS)) 
+    if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS))
        ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
     dmapp_status = dmapp_lock_acquire( &lock_desc[mutex], &(l_state.job.data_seg), proc, 0, &lock_handle[mutex]);
     assert(dmapp_status == DMAPP_RC_SUCCESS);
@@ -422,8 +423,8 @@ void PARMCI_Unlock(int mutex, int proc)
 {
 #if HAVE_DMAPP_LOCK
     int dmapp_status;
-    if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS)) 
-       ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
+    if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS))
+       ARMCI_Error("Runtime Error: armci_unlock mutex out of range\n",911);
     dmapp_status = dmapp_lock_release( lock_handle[mutex], 0);
     assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
@@ -437,7 +438,7 @@ static void dmapp_network_lock(int proc)
     if(use_external_locks) return;
 
 #if HAVE_DMAPP_LOCK
-    dmapp_status = dmapp_lock_acquire( &lock_desc[0], &(l_state.job.data_seg), proc, 0, &lock_handle[0]);
+    dmapp_status = dmapp_lock_acquire( &lock_desc[ARMCI_MAX_LOCKS], &(l_state.job.data_seg), proc, 0, &lock_handle[0]);
     assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
     reg_entry_t *dst_reg= reg_cache_find(proc, 
@@ -464,7 +465,7 @@ static void dmapp_network_unlock(int proc)
     if(use_external_locks) return;
 
 # if HAVE_DMAPP_LOCK
-    dmapp_status = dmapp_lock_release( lock_handle[0], 0 );
+    dmapp_status = dmapp_lock_release( lock_handle[ARMCI_MAX_LOCKS], 0 );
     assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
     reg_entry_t *dst_reg= reg_cache_find(proc, 
