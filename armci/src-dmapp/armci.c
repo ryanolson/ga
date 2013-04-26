@@ -411,7 +411,8 @@ void PARMCI_Lock(int mutex, int proc)
     int dmapp_status;
     if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS)) 
        ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
-    dmapp_lock_acquire( &lock_desc[mutex], &(l_state.job.data_seg), proc, 0, &lock_handle[mutex]);
+    dmapp_status = dmapp_lock_acquire( &lock_desc[mutex], &(l_state.job.data_seg), proc, 0, &lock_handle[mutex]);
+    assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
 #error ARMCI_Lock requires HAVE_DMAPP_LOCK
 #endif
@@ -423,7 +424,8 @@ void PARMCI_Unlock(int mutex, int proc)
     int dmapp_status;
     if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS)) 
        ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
-    dmapp_lock_release( lock_handle[mutex], 0);
+    dmapp_status = dmapp_lock_release( lock_handle[mutex], 0);
+    assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
 #error ARMCI_Unlock requires HAVE_DMAPP_LOCK
 #endif
@@ -2135,54 +2137,6 @@ int PARMCI_Destroy_mutexes()
     MPI_Barrier(l_state.world_comm);
 }
 
-
-#if 0
-void PARMCI_Lock(int mutex, int proc)
-{
-    int dmapp_status;
-    reg_entry_t *dst_reg = NULL;
-
-    /* preconditions */
-    assert(0 <= proc && proc < l_state.size);
-    assert(0 <= mutex && mutex < l_state.num_mutexes[proc]);
-
-    /* locate remote lock */
-    dst_reg = reg_cache_find(proc, &(l_state.mutexes[proc][mutex]), sizeof(unsigned long));
-    assert(dst_reg);
-
-    do {
-        dmapp_status = dmapp_acswap_qw(l_state.local_mutex,
-                                       &(l_state.mutexes[proc][mutex]),
-                                       &(dst_reg->mr.seg),
-                                       proc, 0, l_state.rank + 1);
-        assert(dmapp_status == DMAPP_RC_SUCCESS);
-    }
-    while(*(l_state.local_mutex) != 0);
-}
-
-
-void PARMCI_Unlock(int mutex, int proc)
-{
-    int dmapp_status;
-    reg_entry_t *dst_reg = NULL;
-
-    /* preconditions */
-    assert(0 <= proc && proc < l_state.size);
-    assert(0 <= mutex && mutex < l_state.num_mutexes[proc]);
-
-    dst_reg = reg_cache_find(proc, &(l_state.mutexes[proc][mutex]), sizeof(unsigned long));
-    assert(dst_reg);
-
-    do {
-        dmapp_status = dmapp_acswap_qw(l_state.local_mutex,
-                                       &(l_state.mutexes[proc][mutex]),
-                                       &(dst_reg->mr.seg),
-                                       proc, l_state.rank + 1, 0);
-        assert(dmapp_status == DMAPP_RC_SUCCESS);
-    }
-    while (*(l_state.local_mutex) != l_state.rank + 1);
-}
-#endif
 
 void ARMCI_Set_shm_limit(unsigned long shmemlimit)
 {
