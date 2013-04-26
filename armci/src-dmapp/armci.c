@@ -438,7 +438,8 @@ static void dmapp_network_lock(int proc)
     if(use_external_locks) return;
 
 #if HAVE_DMAPP_LOCK
-    dmapp_status = dmapp_lock_acquire( &lock_desc[ARMCI_MAX_LOCKS], &(l_state.job.data_seg), proc, 0, &lock_handle[0]);
+    dmapp_status = dmapp_lock_acquire( &lock_desc[ARMCI_MAX_LOCKS], &(l_state.job.data_seg), proc, 0,
+                                       &lock_handle[ARMCI_MAX_LOCKS] );
     assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
     reg_entry_t *dst_reg= reg_cache_find(proc, 
