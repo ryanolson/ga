@@ -3342,7 +3342,7 @@ void pnga_update_ghosts(Integer g_a)
 #ifdef CRAY_T3D
    if (!pnga_update5_ghosts(g_a))
 #else
-   if (!pnga_update4_ghosts(g_a))
+   if (!pnga_update2_ghosts(g_a))
 #endif
    {
      pnga_update1_ghosts(g_a);
