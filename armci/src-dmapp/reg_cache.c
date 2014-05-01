@@ -26,7 +26,6 @@
 #include "parmci.h"
 #include "reg_cache.h"
 
-
 /**
  * A registered dmapp segment.
  *
@@ -38,6 +37,7 @@ typedef struct _dmapp_entry_t {
     dmapp_seg_desc_t seg;           /**< dmapp registered memory region */
     int count;                      /**< ref count */
     struct _dmapp_entry_t *next;    /**< next memory region in list */
+    struct _dmapp_entry_t *prev;    /**< prev memory region in list */
 } dmapp_entry_t;
 
 
@@ -45,6 +45,7 @@ typedef struct _dmapp_entry_t {
 static reg_entry_t **reg_cache = NULL; /**< list of caches (one per process) */
 static int reg_nprocs = 0; /**< number of caches (one per process) */
 static dmapp_entry_t *dmapp_cache = NULL; /**< list of cached dmapp segments */
+int dmapp_cache_size=0; 
 
 
 /* the static functions in this module */
@@ -292,7 +293,7 @@ reg_entry_destroy(int rank, reg_entry_t *reg_entry)
 
     if (l_state.rank == rank) {
         dmapp_cache_delete(&reg_entry->mr.seg);
-    }
+    } 
 
     /* free cache entry */
     free(reg_entry);
@@ -531,13 +532,8 @@ dmapp_cache_find_intersection(dmapp_seg_desc_t *seg)
         runner = runner->next;
     }
 
-    /* we assert that the found entry was unique */
-    while (runner) {
-        if (RR_SUCCESS == dmapp_seg_intersects(&runner->seg, seg)) {
-            assert(0);
-        }
-        runner = runner->next;
-    }
+    /* No need to check for duplicates here. The calling function is 
+     * now responsible for detecting duplicate entries and managing their ref-counts */ 
 
     return entry;
 }
@@ -656,6 +652,94 @@ reg_cache_delete(int rank, void *buf)
     return status;
 }
 
+void dmapp_cache_dump()
+{
+   int iter=0;
+   dmapp_entry_t *runner = NULL;
+   runner =  dmapp_cache;
+   if(runner == NULL) {
+      fprintf(stderr,"[%d] Inside dmapp_cache_dump, dmapp_cache is empty \n",
+                        l_state.rank);
+   }
+
+   while(runner!= NULL) {
+       fprintf(stderr,"[%d] seg.addr %p seg.len %zu ref_count %d number %d cache_size %d \n",
+                  l_state.rank,  runner->seg.addr, runner->seg.len,
+                  runner->count, iter, dmapp_cache_size);
+       iter++;
+       runner = runner->next;
+   }
+
+}
+ 
+static inline void dmapp_cache_update_entry(dmapp_seg_desc_t *seg, dmapp_entry_t *runner)
+{ 
+    /* 
+     * The memory regions corresponding to runner->seg and seg overlap. 
+     * Determine the nature of the overlap and handle each case accordingly.
+     */
+    ptrdiff_t seg_beg = 0;
+    ptrdiff_t seg_end = 0;
+    ptrdiff_t runner_beg = 0;
+    ptrdiff_t runner_end = 0;
+
+    /* casts to ptrdiff_t since arithmetic on void* is undefined */
+    seg_beg = (ptrdiff_t)(seg->addr);
+    seg_end = seg_beg + (ptrdiff_t)(seg->len) - 1;
+    runner_beg = (ptrdiff_t)(runner->seg.addr);
+    runner_end = runner_beg + (ptrdiff_t)(runner->seg.len) - 1;
+
+
+    if(seg_beg == runner_beg) {
+        /* CASE1: the two regions have the same starting address. If seg->len 
+         * is larger than length in the cached entry, updated the cached entry 
+         */ 
+        if(runner->seg.len < seg->len) { 
+            runner->seg.len = seg->len;
+        }  
+#if DEBUG
+        fprintf(stderr,"[%d] dmapp_cache_update_entry, CASE1: candidate (%p,%zu), reg-entry (%p,%zu) %d cache_size %d\n",
+                l_state.rank, seg->addr, seg->len, runner->seg.addr, runner->seg.len, dmapp_cache_size);
+#endif
+    } else if(seg_beg < runner_beg) {
+        if(seg_end < runner_end) { 
+            /* CASE2.a: Seg's starting address is lesser than that of the cached entry, 
+             * but seg ends before runner does 
+             * Update the starting address and the length in the cache
+             */     
+           ptrdiff_t addr_diff = 0; 
+           runner->seg.addr = seg->addr;
+           addr_diff        = (runner_beg - seg_end); 
+           runner->seg.len += (size_t) (addr_diff);
+#if DEBUG
+           fprintf(stderr,"[%d] dmapp_cache_update_entry, CASE2.a: candidate (%p,%zu), reg-entry (%p,%zu) %d cache_size %d difference %ld\n",
+                l_state.rank, seg->addr, seg->len, runner->seg.addr, runner->seg.len, dmapp_cache_size, 
+                  (uintptr_t) (runner->seg.addr), (uintptr_t) seg->addr, (size_t) (addr_diff)); 
+#endif
+        } else if(seg_end > runner_end) { 
+            /* CASE2.b: seg_begin is less than runner_begin, seg_end is larger than runner_end */ 
+           runner->seg.addr = seg->addr; 
+           runner->seg.len  = seg->len; 
+#if DEBUG
+           fprintf(stderr,"[%d] dmapp_cache_update_entry, CASE2.b: candidate (%p,%zu), reg-entry (%p,%zu) %d cache_size %d \n",
+                l_state.rank, seg->addr, seg->len, runner->seg.addr, runner->seg.len, dmapp_cache_size, 
+                  (uintptr_t) (runner->seg.addr), (uintptr_t) seg->addr); 
+#endif
+        } 
+    } else if((seg_beg > runner_beg) && (seg_end > runner_end)) { 
+        /* CASE3: Seg's starting address is higher than that of the cached entry. 
+         * And the seg spans beyond runner->seg. Update runner->seg.len 
+         */ 
+        runner->seg.len += (seg_end - runner_end); 
+#if DEBUG
+        fprintf(stderr,"[%d] dmapp_cache_update_entry, CASE3: candidate (%p,%zu), reg-entry (%p,%zu) %d cache_size %d\n",
+                l_state.rank, seg->addr, seg->len, runner->seg.addr, runner->seg.len, dmapp_cache_size);
+#endif
+    }
+
+return; 
+} 
+
 
 /**
  * Increments the ref count of an existing dmapp segement or inserts a new
@@ -671,42 +755,53 @@ static dmapp_entry_t *dmapp_cache_insert(dmapp_seg_desc_t *seg)
     dmapp_entry_t *previous_runner = NULL;
 
     /* this is more restrictive than dmapp_cache_find() in that we locate
-     * exactly the same region starting address */
-    runner = dmapp_cache;
-    while (runner) {
-        if (runner->seg.addr == seg->addr) {
-            break;
-        }
-        previous_runner = runner;
-        runner = runner->next;
-    }
+     * a memory region that overlaps with any of the entries in the cache */ 
+    runner = dmapp_cache_find_intersection(seg); 
 
     if (runner) {
         /* make sure it's an exact match */
-        // assert(runner->seg.len == seg->len);
+        dmapp_cache_update_entry(seg, runner); 
         /* increment ref count */
         ++(runner->count);
 #if DEBUG
-        printf("[%d] incrementing ref count of (%p,%zu) to %d\n",
-                l_state.rank, runner->seg.addr, runner->seg.len, runner->count);
+        fprintf(stderr,"[%d] FOUND: incrementing ref count of (%p,%zu) to %d cache_size %d\n",
+                l_state.rank, runner->seg.addr, runner->seg.len, runner->count, dmapp_cache_size);
 #endif
+
+        /* Now check for other entries in the dmapp_cache that might also overlap 
+         * with "seg". If found, increase their ref-counts and also update 
+         * the cached entries
+         */ 
+        runner = runner->next; 
+        while (runner) {
+            if (RR_SUCCESS == dmapp_seg_intersects(&runner->seg, seg)) {
+                ++(runner->count);
+                dmapp_cache_update_entry(seg, runner); 
+            }
+            runner = runner->next;
+        }
     }
     else {
+        /* Cache miss. Create a new entry */ 
         runner = malloc(sizeof(dmapp_entry_t));
         runner->seg = *seg;
         runner->count = 1;
-        runner->next = NULL;
-        if (previous_runner) {
-            previous_runner->next = runner;
-        }
-        else {
-            dmapp_cache = runner;
-        }
+        runner->next = NULL; 
+        runner->prev = NULL; 
+        if(dmapp_cache != NULL) { 
+            dmapp_cache->prev = runner; 
+            runner->next = dmapp_cache; 
+        }         
+        dmapp_cache = runner;
 #if DEBUG
-        printf("[%d] inserting (%p,%zu)\n",
-                l_state.rank, runner->seg.addr, runner->seg.len);
+        fprintf(stderr,"[%d] NEW: inserting (%p,%zu) runner %p runner->next %p runner->prev %p\n",
+                l_state.rank, runner->seg.addr, runner->seg.len, dmapp_cache_size, runner, runner->prev, runner->next);
 #endif
+        dmapp_cache_size++; 
     }
+#if DEBUG
+    dmapp_cache_dump(); 
+#endif
 
     return runner;
 }
@@ -728,56 +823,74 @@ dmapp_cache_delete(dmapp_seg_desc_t *seg)
 {
     reg_return_t status = RR_FAILURE;
     dmapp_entry_t *runner = NULL;
+    dmapp_entry_t *next_runner = NULL;
     dmapp_entry_t *previous_runner = NULL;
 
     /* preconditions */
     assert(NULL != dmapp_cache);
-    if (NULL == dmapp_cache_find(seg)) {
-        printf("[%d] dmapp_cache_find(seg) failed, seg=(%p,%zu)\n",
-                l_state.rank, seg->addr, seg->len);
-        assert(0);
-    }
+    /* find a cache entry whose memory overlaps with the given seg */ 
+    runner = dmapp_cache_find_intersection(seg); 
 
-    /* this is more restrictive than dmapp_cache_find() in that we locate
-     * exactly the same region starting address */
-    runner = dmapp_cache;
-    while (runner) {
-        if (runner->seg.addr == seg->addr) {
-            break;
-        }
-        previous_runner = runner;
-        runner = runner->next;
-    }
     /* we should have found an entry */
     if (NULL == runner) {
         assert(0);
         return RR_FAILURE;
     }
+        
+    runner->count--; 
+#if DEBUG
+    fprintf(stderr,"[%d] FOUND: derementing ref count of (%p,%zu) to %d cache_size %d\n",
+                l_state.rank, runner->seg.addr, runner->seg.len, runner->count, dmapp_cache_size);
+#endif
+    assert(runner->count >= 0);
+ 
+    runner = runner->next; 
+    while (runner) {
+        /* Run through the remainder of the linked list and find any entry that also overlaps
+         * with the given segment */ 
+        if (RR_SUCCESS == dmapp_seg_intersects(&runner->seg, seg)) {
+             runner->count--; 
+#if DEBUG
+             fprintf(stderr,"[%d] FOUND: derementing ref count of (%p,%zu) to %d cache_size %d\n",
+                l_state.rank, runner->seg.addr, runner->seg.len, runner->count, dmapp_cache_size);
+#endif
+             assert(runner->count >= 0);
+        }
+        runner = runner->next;
+    }
 
     /* decrement ref count */
-    --(runner->count);
-    assert(runner->count >= 0);
+    runner = dmapp_cache; 
+    while(runner) { 
+        next_runner = runner->next; 
+        if (0 == runner->count) {
+            /* pop the entry out of the linked list */
+            previous_runner = runner->prev; 
+            if (previous_runner) {
+                previous_runner->next = runner->next;
+            }
+            if(next_runner) { 
+                next_runner->prev  = previous_runner; 
+            } 
+            if(runner == dmapp_cache) {
+               dmapp_cache->prev = NULL; 
+               dmapp_cache = dmapp_cache->next;
+            }
 #if DEBUG
-    printf("[%d] decrementing ref count of (%p,%zu) to %d\n",
-            l_state.rank, runner->seg.addr, runner->seg.len, runner->count);
+            fprintf(stderr,"***********[%d] removing (%p,%zu) cache_size %d, runner %p\n",
+                l_state.rank, runner->seg.addr, runner->seg.len, dmapp_cache_size, runner);
 #endif
+            dmapp_cache_size--; 
+            dmapp_mem_unregister(&(runner->seg));
 
-    if (0 == runner->count) {
-        /* pop the entry out of the linked list */
-        if (previous_runner) {
-            previous_runner->next = runner->next;
-        }
-        else {
-            dmapp_cache = dmapp_cache->next;
-        }
+            free(runner);
+        } 
+        runner = next_runner; 
+    }  
 #if DEBUG
-        printf("[%d] removing (%p,%zu)\n",
-                l_state.rank, runner->seg.addr, runner->seg.len);
+    dmapp_cache_dump(); 
 #endif
-        dmapp_mem_unregister(&(runner->seg));
-
-        free(runner);
-    }
+ 
 
     return status;
 }
