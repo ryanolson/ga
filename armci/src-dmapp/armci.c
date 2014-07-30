@@ -49,7 +49,7 @@
 // DMAPP_MAX_LOCKS has a maxium value of 1023
 // Declare an extra lock (ARMCI_MAX_LOCKS) for the use_locks_on_[get|put] case
 #define ARMCI_MAX_LOCKS 128
-static dmapp_lock_desc_t lock_desc[ARMCI_MAX_LOCKS+1];
+dmapp_lock_desc_t *lock_desc=NULL;
 __thread dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS+1];
 static int use_locks_on_get = 0;
 static int use_locks_on_put = 0;
@@ -412,7 +412,8 @@ void PARMCI_Lock(int mutex, int proc)
     int dmapp_status;
     if(unlikely(mutex < 0) || unlikely(mutex >= ARMCI_MAX_LOCKS))
        ARMCI_Error("Runtime Error: armci_lock mutex out of range\n",911);
-    dmapp_status = dmapp_lock_acquire( &lock_desc[mutex], &(l_state.job.data_seg), proc, 0, &lock_handle[mutex]);
+    dmapp_status = dmapp_lock_acquire( &lock_desc[mutex], &(l_state.job.sheap_seg), 
+                                        proc, 0, &lock_handle[mutex]);
     assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
 #error ARMCI_Lock requires HAVE_DMAPP_LOCK
@@ -438,7 +439,8 @@ static void dmapp_network_lock(int proc)
     if(use_external_locks) return;
 
 #if HAVE_DMAPP_LOCK
-    dmapp_status = dmapp_lock_acquire( &lock_desc[ARMCI_MAX_LOCKS], &(l_state.job.data_seg), proc, 0,
+    dmapp_status = dmapp_lock_acquire( &lock_desc[ARMCI_MAX_LOCKS], 
+                                       &(l_state.job.sheap_seg), proc, 0,
                                        &lock_handle[ARMCI_MAX_LOCKS] );
     assert(dmapp_status == DMAPP_RC_SUCCESS);
 #else
@@ -1527,7 +1529,15 @@ static void destroy_dmapp_locks(void)
 static void create_dmapp_locks(void)
 {
 #if HAVE_DMAPP_LOCK
-    bzero(lock_desc, sizeof(lock_desc));
+    lock_desc = dmapp_sheap_malloc(sizeof(dmapp_lock_desc_t *)*(ARMCI_MAX_LOCKS+1)); 
+    if(lock_desc == NULL) { 
+       fprintf(stderr,"dmapp_sheap_malloc cannot allocate %d bytes from sym heap memory\n",
+                         sizeof(dmapp_lock_desc_t *)*(ARMCI_MAX_LOCKS+1));
+       fprintf(stderr,"Please consider setting a larger symmetric heap size value, via the ");
+       fprintf(stderr,"env flag: XT_SYMMETRIC_HEAP_SIZE\n"); 
+       assert(0); 
+    } 
+    bzero(lock_desc, sizeof(dmapp_lock_desc_t *)*(ARMCI_MAX_LOCKS+1));
 #else
     l_state.local_lock_buf = PARMCI_Malloc_local(sizeof(long));
     assert(l_state.local_lock_buf);
@@ -1767,6 +1777,10 @@ void PARMCI_Finalize()
     
     /* groups */
     armci_group_finalize();
+
+    if(lock_desc != NULL) {
+        dmapp_sheap_free(lock_desc); 
+    } 
 
     dmapp_terminate();
 
