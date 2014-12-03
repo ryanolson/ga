@@ -64,6 +64,7 @@
 #   define EAF_MAX_FILES 1024
 #endif
 
+static int eafhack_openfiles=0;
 
 static struct {
     char *fname;      /**< Filename --- if non-null is active*/
@@ -170,6 +171,7 @@ int EAF_Open(const char *fname, int type, int *fd)
 
 	if (!MA_alloc_get(MT_CHAR, file[i].size, fname, &handle, &index))
 	  return EAF_ERR_OPEN;
+	if ((i +1) > eafhack_openfiles) eafhack_openfiles++;
     /* MA hack: we pass   type = sizeof MA alloc in megabytes */
 	MA_get_pointer(handle, &ptr);
     if (!(file[i].fname = strdup(fname)))
@@ -282,7 +284,7 @@ int EAF_Write(int fd, eaf_off_t offset, const void *buf, size_t bytes)
     rc = elio_write(file[fd].elio_fd, (Off_t) offset, buf, (Size_t) bytes);
     }
     if (rc != ((Size_t)bytes)){
-	printf("eaf_write: rc ne bytes %d bytes %d\n ", rc, bytes);
+	printf("eaf_write: rc ne bytes %ld bytes %ld\n ", rc, (long)bytes);
         if(rc < 0) return((int)rc); /* rc<0 means ELIO detected error */
         else return EAF_ERR_WRITE;
     }else {
@@ -467,15 +469,17 @@ int EAF_Delete(const char *fname)
 
   int  j, found=0;
   /* get fd from fname */
-  for (j=0; (j< EAF_MAX_FILES) && file[j].fname; j++){
+  for (j=0; (j< eafhack_openfiles); j++){
+    if(file[j].fname){
       if(strcmp(file[j].fname,fname) == 0 && file[j].size >0) {
 	found=1;
 	break;
       }
     }
+    }
 #ifdef DEBUG
   printf("eaf_delete: fname %s found %d \n", fname, found);
-  if (found ==1) printf("eaf_delete: j %d filej.fname %s \n", j, file[j].fname);
+  if (found ==1) printf("eaf_delete: j %d filej.fname %s handle %d \n", j, file[j].fname,file[j].handle);
 #endif
     if (found > 0) {
        if(!MA_free_heap(file[j].handle)) {
