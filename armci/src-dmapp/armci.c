@@ -2573,7 +2573,7 @@ static void check_envs(void)
             armci_use_system_memcpy = 1;
         }
         else if (0 == strncasecmp(value, "n", 1)) {
-            armci_use_system_memcpy = 0;
+            armci_use_system_memcpy = 1;
         }
     }
 #endif

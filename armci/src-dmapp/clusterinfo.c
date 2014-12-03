@@ -39,10 +39,10 @@ int           armci_nclus = -1;            /* number of nodes that make up job *
 ARMCI_Group   armci_smp_group = -1;        /* ARMCI group for local SMP ranks */
 
 /* Optimised memcpy implementation */
-extern void *_cray_armci_memcpy_snb(void *dest, const void *src, size_t n);
-extern void *_cray_armci_memcpy_amd(void *dest, const void *src, size_t n);
+// extern void *_cray_armci_memcpy_snb(void *dest, const void *src, size_t n);
+// extern void *_cray_armci_memcpy_amd(void *dest, const void *src, size_t n);
 void *(*_cray_armci_memcpy)(void *dest, const void *src, size_t n) = NULL;
-int armci_use_system_memcpy = 0;
+int armci_use_system_memcpy = 1;
 
 void
 armci_init_memcpy(void)
@@ -109,14 +109,15 @@ armci_init_memcpy(void)
         _cray_armci_memcpy = NULL;
     }
 
+    
     if (genuine_intel && (family == 6 && model >= 0x2d)) {
         /* Intel Sandy Bridge (0x2d) & Ivy Bridge (0x3e) */
-        _cray_armci_memcpy = _cray_armci_memcpy_snb;
-        armci_use_system_memcpy = 0;
+        //_cray_armci_memcpy = _cray_armci_memcpy_snb;
+        //armci_use_system_memcpy = 0;
     } else if (authentic_amd && family >= 21) {
     	/* AMD Interlagos */
-        _cray_armci_memcpy = _cray_armci_memcpy_amd;
-        armci_use_system_memcpy = 0;
+        //_cray_armci_memcpy = _cray_armci_memcpy_amd;
+        //armci_use_system_memcpy = 0;
     } else {
         /* Unknown vendor/family/model id? */
         armci_use_system_memcpy = 1;
