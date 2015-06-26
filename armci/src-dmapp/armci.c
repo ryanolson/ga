@@ -1019,7 +1019,7 @@ static void rem_acc_pack_header(void *header, int datatype, void *scale,
 
     *(void **)msg = src_ptr;
     msg += sizeof(void*);
-    *(dmapp_seg_desc_t *)msg = src_reg->mr.seg;
+    if(src_reg) { *(dmapp_seg_desc_t *)msg = src_reg->mr.seg; }
     msg += sizeof(dmapp_seg_desc_t);
     *(void **)msg = dst_ptr;
     msg += sizeof(void*);
@@ -1096,6 +1096,8 @@ static void rem_acc_pack_data(void *buffer,
         memcpy(buf, src_ptr + src_idx, stride1_size);
         buf += stride1_size;
     }
+
+    printf("%d: packed strided src_ptr => contiguous buffer @ %x", l_state.rank, buffer);
 }
 
 
@@ -1291,6 +1293,8 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     uint64_t bytes;
     int status = DMAPP_RC_SUCCESS;
 
+    printf("%s: [msgq thread] processing remote AccS from %d\n", l_state.rank, proc);
+
     /* Unpack the remote AccS request */
     rem_ptr = *(void **)msg;
     msg += sizeof(void*);
@@ -1327,15 +1331,20 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     msg += slen;
     /* End Unpack remote AccS request */
 
+    printf("%d: [msgq thread] unpacked request\n", l_state.rank);
+
     if (rem_ptr == NULL) {
         // eager protocol
+        printf("%d: [msgq thread] eager - data is here\n", l_state.rank);
         src_ptr = msg;
     } else {
         // rendezvous protocol
         src_ptr = l_state.rem_acc_buf;
         for(i=0, bytes=1; i<=stride_levels; i++) bytes *= count[i];
+        printf("%d: [msgq thread] rendezvous - pulling data\n", l_state.rank);
         status = dmapp_get(src_ptr, rem_ptr, &rem_desc, proc, bytes/4, DMAPP_DW);
         assert(status == DMAPP_RC_SUCCESS);
+        printf("%d: [msgq thread] rendezvous - data is here\n", l_state.rank);
     }
 
     // perform a completely local AccS where only the dst is actually strided
@@ -1402,19 +1411,26 @@ static int send_remote_AccS(int datatype, void *scale,
     dmapp_seg_desc_t *rem_data_desc;
     void *local_data_ptr;
 
-	// determine the size of the data to be transfered
+    printf("%d: entered send_remote_AccS\n", l_state.rank);
+
+    // determine the size of the data to be transfered
     for(i=0, data_size=1; i<=stride_levels; i++) data_size *= count[i];
 
     /* Test whether we should use the Remote ACC thread or not */
     // default back the direct method if:
     // * large contiguous data
     // * data too large to repack pack into a single contiguous buffer
-    if ((stride_levels == 0 && data_size < armci_rem_acc_contig_threshold) ||
-        l_state.acc_buf_len < data_size) return -1;
+//  if ((stride_levels == 0 && data_size < armci_rem_acc_contig_threshold) ||
+//      l_state.acc_buf_len < data_size) {
+     if(l_state.acc_buf_len < data_size) {
+        printf("%d: WARNING: not using dmapp queue for AccS - %ld bytes\n", l_state.rank, data_size);
+        return -1;
+    }
 
     // Allocate header and calculate pointers
     if (header_size + data_size <= max_put_size) {
         // this is an eager message
+        printf("%d: eager remote AccS\n", l_state.rank);
         header = malloc(header_size + data_size);
         rem_data_ptr = NULL;
         rem_data_desc = NULL;
@@ -1422,6 +1438,7 @@ static int send_remote_AccS(int datatype, void *scale,
         header_size += data_size;
     } else {
         // this is a rendez-vous message
+        printf("%d: rendezvous remote AccS\n", l_state.rank);
         header = malloc(header_size);
         rem_data_reg = reg_cache_find(l_state.rank, l_state.acc_buf, data_size);
         assert(rem_data_reg);
@@ -1430,10 +1447,12 @@ static int send_remote_AccS(int datatype, void *scale,
     }
 
     /* Pack message queue header and data blocks */
+    printf("%d: send_remote_AccS: pack header\n", l_state.rank);
     rem_acc_pack_header(header, datatype, scale,
         rem_data_ptr, rem_data_reg,
         dst_ptr, dst_stride_ar,
         count, stride_levels);
+    printf("%d: send_remote_AccS: pack data\n", l_state.rank);
     rem_acc_pack_data(local_data_ptr,
         src_ptr, src_stride_ar, count, stride_levels);
 
@@ -1442,6 +1461,7 @@ static int send_remote_AccS(int datatype, void *scale,
     assert(nelems <= armci_dmapp_qnelems-1);
 
     /* Initiate the active message */
+    printf("%d: send_remote_AccS: queue active message\n", l_state.rank);
     status = dmapp_queue_put(armci_queue_hndl, header, nelems, DMAPP_QW, proc, 0);
     if (status != DMAPP_RC_SUCCESS) {
         fprintf(stderr,"\n dmapp_queue_put FAILED: %d\n", status);
@@ -1449,7 +1469,9 @@ static int send_remote_AccS(int datatype, void *scale,
     }
 
     /* Wait for completion of Remote accumulate */
+    printf("%d: send_remote_AccS: block on operation\n", l_state.rank);
     parmci_notify_wait(proc, &wait);
+    printf("%d: send_remote_AccS: AccS completed\n", l_state.rank);
 
     return 0;
 }
