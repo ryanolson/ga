@@ -977,7 +977,7 @@ static int do_remote_AccS(int datatype, void *scale,
 }
 
 
-static uint64_t rem_acc_header_size(int stride_levels) {
+static uint64_t rem_acc_header_size(int datatype, int stride_levels) {
 	uint64_t msg=0, slen;
 
 	msg += sizeof(void*);
@@ -1011,7 +1011,7 @@ static int rem_acc_pack_header(void *header, void *src_ptr, dmapp_seg_desc_t *se
 					    int count[/*stride_levels+1*/], int stride_levels)
 {
 	char *msg, *buf;
-	int slen;
+	int i, slen;
 
 	msg = buf = (char *)header;
 
@@ -1387,8 +1387,12 @@ static int send_remote_AccS(int datatype, void *scale,
 
 	char *header;
 	uint64_t data_size;
-	uint64_t header_size = rem_acc_header_size(stride_levels);
+	uint64_t header_size = rem_acc_header_size(datatype, stride_levels);
 	uint64_t max_put_size = (armci_dmapp_qnelems - 1) * sizeof(long);
+
+        void *rem_data_ptr;
+        dmapp_seg_desc_t *rem_data_desc;
+        void *local_data_ptr;
 
 	// determine the size of the data to be transfered
     for(i=0, data_size=1; i<=stride_levels; i++) data_size *= count[i];
