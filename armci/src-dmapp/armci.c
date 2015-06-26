@@ -60,7 +60,7 @@ static int use_external_locks = 0;
 /* Declare the DMAPP Queue API functions weak in case we run on a system without the latest library */
 extern dmapp_return_t
 dmapp_queue_attach(int (*queue_cb)(void *context, void *data, uint32_t len, dmapp_pe_t rank),
-		   void *context, uint64_t flags, dmapp_queue_handle_t *queue_hndl)  __attribute__((weak));
+           void *context, uint64_t flags, dmapp_queue_handle_t *queue_hndl)  __attribute__((weak));
 extern dmapp_return_t dmapp_queue_detach(dmapp_queue_handle_t queue_hndl, uint64_t flags) __attribute__((weak));
 extern dmapp_return_t dmapp_queue_put(dmapp_queue_handle_t  queue_hndl, void *source, uint64_t nelems,
                                       dmapp_type_t type, dmapp_pe_t target_pe, uint64_t flags) __attribute__((weak));
@@ -132,11 +132,11 @@ typedef struct {
     float imag;
 } SingleComplex;
 
-typedef struct{
+typedef struct {
   int sent;
   int received;
   int waited;
-}armci_notify_t;
+} armci_notify_t;
 
 armci_notify_t **_armci_notify_arr;
 
@@ -234,7 +234,7 @@ static void increment_total_outstanding(void)
     ++total_outstanding;
 
     if (total_outstanding == max_outstanding_nb) {
-	dmapp_return_t status;
+    dmapp_return_t status;
 
         status = dmapp_gsync_wait();
         assert(status == DMAPP_RC_SUCCESS);
@@ -907,7 +907,7 @@ static int do_AccS(int datatype, void *scale,
 
 static int do_remote_AccS(int datatype, void *scale,
                          void *src_ptr, /* src_ptr is contiguous */
-                   	     void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
+                            void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
                          int count[/*stride_levels+1*/], int stride_levels)
 {
     int i, j;
@@ -943,13 +943,13 @@ static int do_remote_AccS(int datatype, void *scale,
     // grab the atomic lock
     dmapp_network_lock(l_state.rank);
 
-	// accumulate to each contiguous segment
+    // accumulate to each contiguous segment
     for(i=0; i<n1dim; i++) {
 
-		// calculate src_idx
+        // calculate src_idx
         src_idx = count[0]*i;
 
-		// calculate dst_idx
+        // calculate dst_idx
         dst_idx = 0;
         for(j=1; j<=stride_levels; j++) {
             dst_idx += dst_bvalue[j] * dst_stride_ar[j-1];
@@ -961,9 +961,9 @@ static int do_remote_AccS(int datatype, void *scale,
             }
         }
 
-		// contiguous accumulate
+        // contiguous accumulate
         do_acc((char *)src_ptr + src_idx, (char *)dst_ptr + dst_idx, datatype,
-		       scale, count[0]);
+               scale, count[0]);
     }
 
     // release the lock
@@ -978,46 +978,47 @@ static int do_remote_AccS(int datatype, void *scale,
 
 
 static uint64_t rem_acc_header_size(int datatype, int stride_levels) {
-	uint64_t msg=0, slen;
+    uint64_t msg=0, slen;
 
-	msg += sizeof(void*);
-	msg += sizeof(dmapp_seg_desc_t);
-	msg += sizeof(void*);
-	msg += sizeof(int);
-	msg += sizeof(int)*stride_levels;
-	msg += sizeof(int)*stride_levels;
-	msg += sizeof(int)*(stride_levels+1);
-	msg += sizeof(int);
-	switch(datatype){
-	case ARMCI_ACC_INT:
-		slen= sizeof(int); break;
-	case ARMCI_ACC_DCP:
-		slen=2*sizeof(double);break;
-	case ARMCI_ACC_DBL:
-		slen = sizeof(double); break;
-	case ARMCI_ACC_CPL:
-		slen=2*sizeof(float);break;
-	case ARMCI_ACC_FLT:
-		slen = sizeof(float); break;
-	default: slen=0;
-	}
-	msg += slen;
+    msg += sizeof(void*);
+    msg += sizeof(dmapp_seg_desc_t);
+    msg += sizeof(void*);
+    msg += sizeof(int);
+    msg += sizeof(int)*stride_levels;
+    msg += sizeof(int)*stride_levels;
+    msg += sizeof(int)*(stride_levels+1);
+    msg += sizeof(int);
+    switch(datatype){
+    case ARMCI_ACC_INT:
+        slen= sizeof(int); break;
+    case ARMCI_ACC_DCP:
+        slen=2*sizeof(double);break;
+    case ARMCI_ACC_DBL:
+        slen = sizeof(double); break;
+    case ARMCI_ACC_CPL:
+        slen=2*sizeof(float);break;
+    case ARMCI_ACC_FLT:
+        slen = sizeof(float); break;
+    default: slen=0;
+    }
+    msg += slen;
 
-	return msg;
+    return msg;
 }
 
-static int rem_acc_pack_header(void *header, void *src_ptr, dmapp_seg_desc_t *seg,
-						void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
-					    int count[/*stride_levels+1*/], int stride_levels)
+static void rem_acc_pack_header(void *header, int datatype, void *scale,
+                        void *src_ptr, reg_entry_t *src_reg,
+                        void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
+                        int count[/*stride_levels+1*/], int stride_levels)
 {
-	char *msg, *buf;
-	int i, slen;
+    char *msg, *buf;
+    int i, slen;
 
-	msg = buf = (char *)header;
+    msg = buf = (char *)header;
 
-	*(void **)msg = src_ptr;
+    *(void **)msg = src_ptr;
     msg += sizeof(void*);
-    *(dmapp_seg_desc_t *)msg = seg;
+    *(dmapp_seg_desc_t *)msg = src_reg->mr.seg;
     msg += sizeof(dmapp_seg_desc_t);
     *(void **)msg = dst_ptr;
     msg += sizeof(void*);
@@ -1052,22 +1053,24 @@ static int rem_acc_pack_header(void *header, void *src_ptr, dmapp_seg_desc_t *se
     default: slen=0;
     }
     msg += slen;
-	return (msg - buf);
 }
 
 /*
    Copies the strided data from src_ptr to a contiguous buffer.
 */
 static void rem_acc_pack_data(void *buffer,
-	                   void *src_ptr, int src_stride_ar[/*stride_levels*/],
+                       void *src_ptr, int src_stride_ar[/*stride_levels*/],
                        int count[/*stride_levels+1*/], int stride_levels)
 {
-	int n1dim = 1;
-	size_t stride1_size = count[0];
-	char *src = (char *) src_ptr;
-	char *buf = (char *) buffer;
+    int i, j, n1dim = 1;
+    size_t stride1_size = count[0];
+    char *src = (char *) src_ptr;
+    char *buf = (char *) buffer;
+    uint64_t src_idx;
+    int src_bvalue[7], src_bunit[7];
+    int dst_bvalue[7], dst_bunit[7];
 
-	/* number of n-element of the first dimension */
+    /* number of n-element of the first dimension */
     for(i=1; i<=stride_levels; i++) { n1dim *= count[i]; }
 
     /* calculate the offset indices */
@@ -1090,7 +1093,7 @@ static void rem_acc_pack_data(void *buffer,
             }
         }
         memcpy(buf, src_ptr + src_idx, stride1_size);
-		buf += stride1_size;
+        buf += stride1_size;
 }
 
 
@@ -1273,9 +1276,9 @@ static int do_remote_AccS_old(int datatype, void *scale,
     return 0;
 }
 
-static int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
+int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
 {
-	int i;
+    int i;
     void *rem_ptr;
     void *dst_ptr; int *dst_stride_ar;
     dmapp_seg_desc_t rem_desc;
@@ -1283,7 +1286,8 @@ static int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     int datatype; void *scale;
     int stride_levels;
     int slen;
-	uint64_t bytes;
+    uint64_t bytes;
+    int status = DMAPP_RC_SUCCESS;
 
     /* Unpack the remote AccS request */
     rem_ptr = *(void **)msg;
@@ -1319,28 +1323,28 @@ static int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     default: slen=0;
     }
     msg += slen;
-	/* End Unpack remote AccS request */
+    /* End Unpack remote AccS request */
 
-	if (rem_ptr == NULL && rem_desc == NULL) {
-		// eager protocol
-		src_ptr = msg;
-	} else {
-		// rendezvous protocol
-		src_ptr = l_state.rem_acc_buf;
-		for(i=0, bytes=1; i<=stride_levels; i++) bytes *= count[i];
-		status = dmapp_get(src_ptr, rem_ptr, rem_desc, proc, bytes/4, DMAPP_DW);
-		assert(status == DMAPP_RC_SUCCESS);
-	}
+    if (rem_ptr == NULL) {
+        // eager protocol
+        src_ptr = msg;
+    } else {
+        // rendezvous protocol
+        src_ptr = l_state.rem_acc_buf;
+        for(i=0, bytes=1; i<=stride_levels; i++) bytes *= count[i];
+        status = dmapp_get(src_ptr, rem_ptr, &rem_desc, proc, bytes/4, DMAPP_DW);
+        assert(status == DMAPP_RC_SUCCESS);
+    }
 
-	// perform a completely local AccS where only the dst is actually strided
-	return do_remote_AccS(datatype, scale,
-						 src_ptr,
-						 dst_ptr, dst_stride_ar,
-						 count, stride_levels);
+    // perform a completely local AccS where only the dst is actually strided
+    return do_remote_AccS(datatype, scale,
+                         src_ptr,
+                         dst_ptr, dst_stride_ar,
+                         count, stride_levels);
 
     return do_remote_AccS_old(datatype, scale,
                           src_ptr, src_stride_ar,
-                          &src_seg,
+                          &rem_desc,
                           dst_ptr, dst_stride_ar,
                           count, stride_levels, proc);
 }
@@ -1383,56 +1387,57 @@ static int send_remote_AccS(int datatype, void *scale,
 {
     int i, nelems, wait;
     dmapp_return_t status;
-    reg_entry_t *src_reg = NULL;
+    reg_entry_t *rem_data_reg = NULL;
 
-	char *header;
-	uint64_t data_size;
-	uint64_t header_size = rem_acc_header_size(datatype, stride_levels);
-	uint64_t max_put_size = (armci_dmapp_qnelems - 1) * sizeof(long);
+    char *header;
+    uint64_t data_size;
+    uint64_t header_size = rem_acc_header_size(datatype, stride_levels);
+    uint64_t max_put_size = (armci_dmapp_qnelems - 1) * sizeof(long);
 
-        void *rem_data_ptr;
-        dmapp_seg_desc_t *rem_data_desc;
-        void *local_data_ptr;
+    void *rem_data_ptr;
+    dmapp_seg_desc_t *rem_data_desc;
+    void *local_data_ptr;
 
 	// determine the size of the data to be transfered
     for(i=0, data_size=1; i<=stride_levels; i++) data_size *= count[i];
 
-	/* Test whether we should use the Remote ACC thread or not */
-	// default back the direct method if:
-	// * large contiguous data
-	// * data too large to repack pack into a single contiguous buffer
+    /* Test whether we should use the Remote ACC thread or not */
+    // default back the direct method if:
+    // * large contiguous data
+    // * data too large to repack pack into a single contiguous buffer
     if ((stride_levels == 0 && data_size < armci_rem_acc_contig_threshold) ||
         l_state.acc_buf_len < data_size) return -1;
 
-	// Allocate header and calculate pointers
+    // Allocate header and calculate pointers
     if (header_size + data_size <= max_put_size) {
-		// this is an eager message
-		header = malloc(header_size + data_size);
-		rem_data_ptr = NULL;
-		rem_data_desc = NULL;
-		local_data_ptr = header + header_size;
-		header_size += data_size;
-	} else {
-		// this is a rendez-vous message
-		header = malloc(header_size);
-		src_reg = reg_cache_find(l_state.rank, l_state.acc_buf, data_size);
-		assert(src_reg);
-		rem_data_ptr = l_state.acc_buf;
-		rem_data_desc = src_reg->mr.seg;
-		local_data_ptr = l_state.acc_buf;
-	}
+        // this is an eager message
+        header = malloc(header_size + data_size);
+        rem_data_ptr = NULL;
+        rem_data_desc = NULL;
+        local_data_ptr = header + header_size;
+        header_size += data_size;
+    } else {
+        // this is a rendez-vous message
+        header = malloc(header_size);
+        rem_data_reg = reg_cache_find(l_state.rank, l_state.acc_buf, data_size);
+        assert(rem_data_reg);
+        rem_data_ptr = l_state.acc_buf;
+        local_data_ptr = l_state.acc_buf;
+    }
 
-	/* Pack message queue header and data blocks */
-	rem_acc_pack_header(header, rem_data_ptr, rem_data_desc,
-		dst_ptr, dst_stride_ar, count, stride_levels);
-	rem_acc_pack_data(local_data_ptr,
-		src_ptr, src_stride_ar, count, stride_levels);
+    /* Pack message queue header and data blocks */
+    rem_acc_pack_header(header, datatype, scale,
+        rem_data_ptr, rem_data_reg,
+        dst_ptr, dst_stride_ar,
+        count, stride_levels);
+    rem_acc_pack_data(local_data_ptr,
+        src_ptr, src_stride_ar, count, stride_levels);
 
     /* Calculate message length in whole QWs */
     nelems = (header_size + sizeof(long) - 1)/sizeof(long);
     assert(nelems <= armci_dmapp_qnelems-1);
 
-	/* Initiate the active message */
+    /* Initiate the active message */
     status = dmapp_queue_put(armci_queue_hndl, header, nelems, DMAPP_QW, proc, 0);
     if (status != DMAPP_RC_SUCCESS) {
         fprintf(stderr,"\n dmapp_queue_put FAILED: %d\n", status);
@@ -1772,7 +1777,7 @@ static void dmapp_alloc_buf(void)
     l_state.acc_buf = PARMCI_Malloc_local(l_state.acc_buf_len);
     assert(l_state.acc_buf);
     l_state.rem_acc_buf_len = ARMCI_MAX((armci_page_size), PIPEDEPTH*CHUNK_SIZE_1D);
-	l_state.rem_acc_buf_len = ARMCI_MAX((armci_page_size), (24*ONEMEG));
+    l_state.rem_acc_buf_len = ARMCI_MAX((armci_page_size), (24*ONEMEG));
     l_state.rem_acc_buf = PARMCI_Malloc_local(l_state.rem_acc_buf_len);
     assert(l_state.rem_acc_buf);
 
@@ -2534,6 +2539,7 @@ void ARMCI_Memdt(armci_meminfo_t *meminfo, long offset)
 {
     assert(0);
 }
+
 
 
 void ARMCI_Memctl(armci_meminfo_t *meminfo)
