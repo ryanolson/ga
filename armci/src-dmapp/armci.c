@@ -916,17 +916,12 @@ static int do_remote_AccS(int datatype, void *scale,
     int src_bvalue[7], src_bunit[7];
     int dst_bvalue[7], dst_bunit[7];
 
-#if HAVE_DMAPP_LOCK
-    int lock_on_get = use_locks_on_get;
-    int lock_on_put = use_locks_on_put;
-    use_locks_on_get = 0;
-    use_locks_on_put = 0;
-#endif
-
     /* number of n-element of the first dimension */
     n1dim = 1;
-    for(i=1; i<=stride_levels; i++)
-        n1dim *= count[i];
+    for(i=1; i<=stride_levels; i++) n1dim *= count[i];
+
+    printf("%d: [msgq thread] n1dim=%d\n", l_state.rank, n1dim);
+    printf("%d: [msgq thread] stride1=%d\n", l_state.rank, count[0]);
 
     /* calculate the destination indices */
     src_bvalue[0] = 0; src_bvalue[1] = 0; src_bunit[0] = 1; src_bunit[1] = 1;
@@ -941,7 +936,9 @@ static int do_remote_AccS(int datatype, void *scale,
     }
 
     // grab the atomic lock
+    printf("%d: [msgq thread] acquire lock\n", l_state.rank);
     dmapp_network_lock(l_state.rank);
+    printf("%d: [msgq thread] lock acquired\n", l_state.rank);
 
     // accumulate to each contiguous segment
     for(i=0; i<n1dim; i++) {
@@ -968,13 +965,11 @@ static int do_remote_AccS(int datatype, void *scale,
     }
 
     // release the lock
+    printf("%d: [msgq thread] release lock\n", l_state.rank);
     dmapp_network_unlock(l_state.rank);
+    printf("%d: [msgq thread] lock released\n", l_state.rank);
 
-#if HAVE_DMAPP_LOCK
-    use_locks_on_get = lock_on_get;
-    use_locks_on_put = lock_on_put;
-#endif
-
+    return 0;
 }
 
 
@@ -1293,7 +1288,7 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     uint64_t bytes;
     int status = DMAPP_RC_SUCCESS;
 
-    printf("%s: [msgq thread] processing remote AccS from %d\n", l_state.rank, proc);
+    printf("%d: [msgq thread] processing remote AccS from %d\n", l_state.rank, proc);
 
     /* Unpack the remote AccS request */
     rem_ptr = *(void **)msg;
@@ -1348,11 +1343,18 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     }
 
     // perform a completely local AccS where only the dst is actually strided
-    return do_remote_AccS(datatype, scale,
-                         src_ptr,
-                         dst_ptr, dst_stride_ar,
-                         count, stride_levels);
+    printf("%d: [msgq thead] calling do_remote_AccS(%d, %x, %x, %x %x, %x, %d)\n",
+        l_state.rank, datatype, scale, src_ptr, dst_ptr, dst_stride_ar, count, stride_levels);
 
+    do_remote_AccS(datatype, scale,
+                   src_ptr,
+                   dst_ptr, dst_stride_ar,
+                   count, stride_levels);
+
+    // Notify source that request has completed
+    parmci_notify(proc);
+
+    return 0;
 /*
     return do_remote_AccS_old(datatype, scale,
                           rem_ptr, src_stride_ar,
