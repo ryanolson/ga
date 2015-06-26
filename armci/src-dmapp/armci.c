@@ -952,6 +952,7 @@ static int do_remote_AccS(int datatype, void *scale,
         // calculate dst_idx
         dst_idx = 0;
         for(j=1; j<=stride_levels; j++) {
+
             dst_idx += dst_bvalue[j] * dst_stride_ar[j-1];
             if((i+1) % dst_bunit[j] == 0) {
                 dst_bvalue[j]++;
@@ -1094,6 +1095,7 @@ static void rem_acc_pack_data(void *buffer,
         }
         memcpy(buf, src_ptr + src_idx, stride1_size);
         buf += stride1_size;
+    }
 }
 
 
@@ -1279,7 +1281,7 @@ static int do_remote_AccS_old(int datatype, void *scale,
 int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
 {
     int i;
-    void *rem_ptr;
+    void *rem_ptr, *src_ptr;
     void *dst_ptr; int *dst_stride_ar;
     dmapp_seg_desc_t rem_desc;
     int *count;
@@ -1342,11 +1344,13 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
                          dst_ptr, dst_stride_ar,
                          count, stride_levels);
 
+/*
     return do_remote_AccS_old(datatype, scale,
-                          src_ptr, src_stride_ar,
+                          rem_ptr, src_stride_ar,
                           &rem_desc,
                           dst_ptr, dst_stride_ar,
                           count, stride_levels, proc);
+*/
 }
 
 static int armci_queue_cb(void *context, void *data, uint32_t len, dmapp_pe_t rank)
