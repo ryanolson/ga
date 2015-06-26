@@ -976,28 +976,29 @@ static int do_remote_AccS(int datatype, void *scale,
 static uint64_t rem_acc_header_size(int datatype, int stride_levels) {
     uint64_t msg=0, slen;
 
+    // src_ptr
     msg += sizeof(void*);
+
+    // src_reg
     msg += sizeof(dmapp_seg_desc_t);
+
+    // dst_ptr
     msg += sizeof(void*);
+
+    // stride_levels
     msg += sizeof(int);
+
+    // dst_stride_ar
     msg += sizeof(int)*stride_levels;
-    msg += sizeof(int)*stride_levels;
+
+    // count
     msg += sizeof(int)*(stride_levels+1);
+
+    // datatype
     msg += sizeof(int);
-    switch(datatype){
-    case ARMCI_ACC_INT:
-        slen= sizeof(int); break;
-    case ARMCI_ACC_DCP:
-        slen=2*sizeof(double);break;
-    case ARMCI_ACC_DBL:
-        slen = sizeof(double); break;
-    case ARMCI_ACC_CPL:
-        slen=2*sizeof(float);break;
-    case ARMCI_ACC_FLT:
-        slen = sizeof(float); break;
-    default: slen=0;
-    }
-    msg += slen;
+
+    // scale
+    msg += 2*sizeof(double);
 
     return msg;
 }
@@ -1014,38 +1015,45 @@ static void rem_acc_pack_header(void *header, int datatype, void *scale,
 
     *(void **)msg = src_ptr;
     msg += sizeof(void*);
+
     if(src_reg) { *(dmapp_seg_desc_t *)msg = src_reg->mr.seg; }
     msg += sizeof(dmapp_seg_desc_t);
+
     *(void **)msg = dst_ptr;
     msg += sizeof(void*);
+
     *(int*)msg = stride_levels;
     msg += sizeof(int);
-    for (i = 0; i < stride_levels; i++) {
+
+    for (i=0; i < stride_levels; i++) {
         ((int *)msg)[i] = dst_stride_ar[i];
     }
     msg += sizeof(int)*stride_levels;
-    for (i = 0; i < stride_levels+1; i++) {
+
+    for (i=0; i < stride_levels+1; i++) {
         ((int*)msg)[i] = count[i];
     }
     msg += sizeof(int)*(stride_levels+1);
+
     *(int *)msg = datatype;
     msg += sizeof(int);
+
     /* pack scale */
     switch(datatype){
     case ARMCI_ACC_INT:
-        *(int*)msg = *(int*)scale; slen= sizeof(int); break;
+        *(int*)msg = *(int*)scale; slen=sizeof(int); break;
     case ARMCI_ACC_DCP:
         ((double*)msg)[0] = ((double*)scale)[0];
         ((double*)msg)[1] = ((double*)scale)[1];
-        slen=2*sizeof(double);break;
+        slen=2*sizeof(double); break;
     case ARMCI_ACC_DBL:
-        *(double*)msg = *(double*)scale; slen = sizeof(double); break;
+        *(double*)msg = *(double*)scale; slen=sizeof(double); break;
     case ARMCI_ACC_CPL:
         ((float*)msg)[0] = ((float*)scale)[0];
         ((float*)msg)[1] = ((float*)scale)[1];
-        slen=2*sizeof(float);break;
+        slen=2*sizeof(float); break;
     case ARMCI_ACC_FLT:
-        *(float*)msg = *(float*)scale; slen = sizeof(float); break;
+        *(float*)msg = *(float*)scale; slen=sizeof(float); break;
     default: slen=0;
     }
     msg += slen;
@@ -1290,6 +1298,7 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
 
     printf("%d: [msgq thread] processing remote AccS from %d\n", l_state.rank, proc);
 
+
     /* Unpack the remote AccS request */
     rem_ptr = *(void **)msg;
     msg += sizeof(void*);
@@ -1313,17 +1322,7 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     msg += sizeof(int);
 
     scale = msg;
-    /* get scale len */
-    switch(datatype){
-    case ARMCI_ACC_INT: slen = sizeof(int); break;
-    case ARMCI_ACC_DCP: slen = 2*sizeof(double); break;
-    case ARMCI_ACC_DBL: slen = sizeof(double); break;
-    case ARMCI_ACC_CPL: slen = 2*sizeof(float); break;
-    case ARMCI_ACC_FLT: slen = sizeof(float); break;
-    case ARMCI_ACC_LNG: slen = sizeof(long); break;
-    default: slen=0;
-    }
-    msg += slen;
+    msg += 2*sizeof(double);
     /* End Unpack remote AccS request */
 
     printf("%d: [msgq thread] unpacked request\n", l_state.rank);
