@@ -1042,6 +1042,8 @@ static void rem_acc_pack_header(void *header, int datatype, void *scale,
     switch(datatype){
     case ARMCI_ACC_INT:
         *(int*)msg = *(int*)scale; slen=sizeof(int); break;
+    case ARMCI_ACC_LNG:
+        *(long*)msg = *(long*)scale; slen=sizeof(long); break;
     case ARMCI_ACC_DCP:
         ((double*)msg)[0] = ((double*)scale)[0];
         ((double*)msg)[1] = ((double*)scale)[1];
@@ -1286,6 +1288,7 @@ static int do_remote_AccS_old(int datatype, void *scale,
 int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
 {
     int i;
+    char *start = msg;
     void *rem_ptr, *src_ptr;
     void *dst_ptr; int *dst_stride_ar;
     dmapp_seg_desc_t rem_desc;
@@ -1326,6 +1329,9 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
     /* End Unpack remote AccS request */
 
     // printf("%d: [msgq thread] unpacked request\n", l_state.rank);
+    // printf("%d: [msgq thread] header_size=%ld\n", l_state.rank, (long)(msg-start));
+    // printf("%d: [msgq thread] data[0]=%d\n", l_state.rank, *((int *)msg));
+    // printf("%d: [msgq thread] scale[0]=%d\n", l_state.rank, *((int *)scale));
 
     if (rem_ptr == NULL) {
         // eager protocol
@@ -1432,6 +1438,8 @@ static int send_remote_AccS(int datatype, void *scale,
     if (header_size + data_size <= max_put_size) {
         // this is an eager message
         // printf("%d: eager remote AccS\n", l_state.rank);
+        // printf("%d: header_size=%ld; data_size=%ld\n", l_state.rank, header_size, data_size);
+        // printf("%d: stride_levels=%d; count[0]=%d\n", l_state.rank, stride_levels, count[0]);
         header = malloc(header_size + data_size);
         rem_data_ptr = NULL;
         rem_data_desc = NULL;
@@ -1460,6 +1468,7 @@ static int send_remote_AccS(int datatype, void *scale,
 
     /* Calculate message length in whole QWs */
     nelems = (header_size + sizeof(long) - 1)/sizeof(long);
+    // printf("%d: nelems=%d\n", l_state.rank, nelems);
     assert(nelems <= armci_dmapp_qnelems-1);
 
     /* Initiate the active message */
