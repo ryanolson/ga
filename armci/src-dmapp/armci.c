@@ -1440,6 +1440,7 @@ static int send_remote_AccS(int datatype, void *scale,
     } else {
         // this is a rendez-vous message
         // printf("%d: rendezvous remote AccS\n", l_state.rank);
+        return -1; // turning off rendezvous protocol
         header = malloc(header_size);
         rem_data_reg = reg_cache_find(l_state.rank, l_state.acc_buf, data_size);
         assert(rem_data_reg);
