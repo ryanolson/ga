@@ -1470,6 +1470,9 @@ static int send_remote_AccS(int datatype, void *scale,
         assert(0);
     }
 
+    /* free header */
+    free(header);
+
     /* Wait for completion of Remote accumulate */
     // printf("%d: send_remote_AccS: block on operation\n", l_state.rank);
     parmci_notify_wait(proc, &wait);
