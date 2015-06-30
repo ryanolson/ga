@@ -79,6 +79,18 @@ dmapp_queue_handle_t  armci_queue_hndl;
 static uint32_t armci_dmapp_qdepth = 128; // DMAPP_QUEUE_DEFAULT_DEPTH;
 static uint32_t armci_dmapp_qnelems = DMAPP_QUEUE_MAX_NELEMS; // DMAPP_QUEUE_DEFAULT_NELEMS;
 static uint64_t armci_dmapp_qflags = DMAPP_QUEUE_ASYNC_PROGRESS;
+static int *queue_fence_list = NULL;
+static int queue_send_operation(void *, size_t, int);
+#define REM_OP_FENCE 10
+#define REM_OP_ACCS  20
+
+static int remote_acc_profile_period = 0;
+static uint64_t remote_acc_calls = 0;
+static uint64_t remote_acc_eager_count = 0;
+static uint64_t remote_acc_eager_bytes = 0;
+static uint64_t remote_acc_rendezvous_count = 0;
+static uint64_t remote_acc_rendezvous_bytes = 0;
+
 #endif
 
 /* exported state */
@@ -976,6 +988,9 @@ static int do_remote_AccS(int datatype, void *scale,
 static uint64_t rem_acc_header_size(int datatype, int stride_levels) {
     uint64_t msg=0, slen;
 
+    // remote operation
+    msg += sizeof(long);
+
     // src_ptr
     msg += sizeof(void*);
 
@@ -1003,7 +1018,7 @@ static uint64_t rem_acc_header_size(int datatype, int stride_levels) {
     return msg;
 }
 
-static void rem_acc_pack_header(void *header, int datatype, void *scale,
+static void rem_acc_pack_header(void *header, long operation, int datatype, void *scale,
                         void *src_ptr, reg_entry_t *src_reg,
                         void *dst_ptr, int dst_stride_ar[/*stride_levels*/],
                         int count[/*stride_levels+1*/], int stride_levels)
@@ -1013,9 +1028,15 @@ static void rem_acc_pack_header(void *header, int datatype, void *scale,
 
     msg = buf = (char *)header;
 
+    // remote operation
+    *(long *)msg = operation;
+    msg += sizeof(long);
+
+    // src_ptr: address of local data (to be fetched)
     *(void **)msg = src_ptr;
     msg += sizeof(void*);
 
+    // dmapp descriptor for src_ptr region
     if(src_reg) { *(dmapp_seg_desc_t *)msg = src_reg->mr.seg; }
     msg += sizeof(dmapp_seg_desc_t);
 
@@ -1285,9 +1306,10 @@ static int do_remote_AccS_old(int datatype, void *scale,
     return 0;
 }
 
-int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
+int queue_process_accs(char *msg, uint32_t len, dmapp_pe_t proc)
 {
     int i;
+    int is_rendezvous = 0;
     char *start = msg;
     void *rem_ptr, *src_ptr;
     void *dst_ptr; int *dst_stride_ar;
@@ -1339,6 +1361,7 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
         src_ptr = msg;
     } else {
         // rendezvous protocol
+        is_rendezvous = 1;
         src_ptr = l_state.rem_acc_buf;
         for(i=0, bytes=1; i<=stride_levels; i++) bytes *= count[i];
         // printf("%d: [msgq thread] rendezvous - pulling data\n", l_state.rank);
@@ -1357,7 +1380,9 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
                    count, stride_levels);
 
     // Notify source that request has completed
-    parmci_notify(proc);
+    if (is_rendezvous) {
+        parmci_notify(proc);
+    }
 
     return 0;
 /*
@@ -1369,11 +1394,32 @@ int process_remote_AccS(char *msg, uint32_t len, dmapp_pe_t proc)
 */
 }
 
-static int armci_queue_cb(void *context, void *data, uint32_t len, dmapp_pe_t rank)
+static int queue_process_fence(void *data, uint32_t len, dmapp_pe_t rank) {
+    parmci_notify(rank);
+    return 0;
+}
+
+static int queue_process_operation(long operation, void *data, uint32_t len, dmapp_pe_t rank) {
+    if (operation == REM_OP_ACCS) {
+        return queue_process_accs(data, len, rank);
+    }
+    else if (operation == REM_OP_FENCE) {
+        return queue_process_fence(data, len, rank);
+    } else {
+        assert(0);
+    }
+    return 0;
+}
+
+static int armci_queue_cb(void *context, void *buffer, uint32_t len, dmapp_pe_t rank)
 {
     static int first_call = 1;
     dmapp_return_t status;
     dmapp_rma_attrs_ext_t attrs;
+
+    // unpack buffer
+    long operation = *((long *) buffer);
+    void *data = (void *)((char *)buffer + sizeof(long));
 
     /* Set the DMAPP attributes on first invocation of the helper thread */
     if (first_call == 1) {
@@ -1394,7 +1440,27 @@ static int armci_queue_cb(void *context, void *data, uint32_t len, dmapp_pe_t ra
         first_call=0;
     }
 
-    return process_remote_AccS(data, len, rank);
+    return queue_process_operation(operation, data, len, rank);
+}
+
+static int queue_send_operation(void *data, size_t len, int proc) {
+
+    dmapp_return_t status;
+
+    /* Calculate message length in whole QWs */
+    uint32_t nelems = (len + sizeof(long) - 1)/sizeof(long);
+    // printf("%d: nelems=%d\n", l_state.rank, nelems);
+    assert(nelems <= armci_dmapp_qnelems-1);
+
+    /* Initiate the active message */
+    // printf("%d: queue_send_operation: %ld, %d\n", l_state.rank, *(long *)data, nelems);
+    status = dmapp_queue_put(armci_queue_hndl, data, nelems, DMAPP_QW, proc, 0);
+    if (status != DMAPP_RC_SUCCESS) {
+        fprintf(stderr,"\n dmapp_queue_put FAILED: %d\n", status);
+        assert(0);
+    }
+
+    return 0;
 }
 
 /* Attempt to perform the Remote ACC using a helper thread
@@ -1417,6 +1483,26 @@ static int send_remote_AccS(int datatype, void *scale,
     void *rem_data_ptr;
     dmapp_seg_desc_t *rem_data_desc;
     void *local_data_ptr;
+
+    /*
+       This function has two behaviors, it can either:
+       1) fire-and-forget eager accs, or
+       2) block on rendezvous accs.
+
+       In order to ensure an eager acc has completed, we need to perform
+       an ARMCI_Fence on the rank which will be performing the Acc.  The
+       fence will block until all outstanding remote operations have completed.
+    */  
+
+    if(remote_acc_profile_period) {
+       if(++remote_acc_calls % remote_acc_profile_period == 0) {
+           printf("%d: remote accs calls: %ld\n", l_state.rank, remote_acc_calls);
+           printf("%d: remote accs eager: %ld calls; %ld bytes\n", 
+                  l_state.rank, remote_acc_eager_count, remote_acc_eager_bytes);
+           printf("%d: remote accs rendezvous: %ld calls; %ld bytes\n", 
+                  l_state.rank, remote_acc_rendezvous_count, remote_acc_rendezvous_bytes);
+        }
+    }
 
     // printf("%d: entered send_remote_AccS\n", l_state.rank);
 
@@ -1441,24 +1527,28 @@ static int send_remote_AccS(int datatype, void *scale,
         // printf("%d: header_size=%ld; data_size=%ld\n", l_state.rank, header_size, data_size);
         // printf("%d: stride_levels=%d; count[0]=%d\n", l_state.rank, stride_levels, count[0]);
         header = malloc(header_size + data_size);
+        queue_fence_list[proc] = 1;
         rem_data_ptr = NULL;
         rem_data_desc = NULL;
         local_data_ptr = header + header_size;
         header_size += data_size;
+        remote_acc_eager_count += 1;
+        remote_acc_eager_bytes += data_size;
     } else {
         // this is a rendez-vous message
         // printf("%d: rendezvous remote AccS\n", l_state.rank);
-        return -1; // turning off rendezvous protocol
         header = malloc(header_size);
         rem_data_reg = reg_cache_find(l_state.rank, l_state.acc_buf, data_size);
         assert(rem_data_reg);
         rem_data_ptr = l_state.acc_buf;
         local_data_ptr = l_state.acc_buf;
+        remote_acc_rendezvous_count += 1;
+        remote_acc_rendezvous_bytes += data_size;
     }
 
     /* Pack message queue header and data blocks */
     // printf("%d: send_remote_AccS: pack header\n", l_state.rank);
-    rem_acc_pack_header(header, datatype, scale,
+    rem_acc_pack_header(header, REM_OP_ACCS, datatype, scale,
         rem_data_ptr, rem_data_reg,
         dst_ptr, dst_stride_ar,
         count, stride_levels);
@@ -1466,26 +1556,18 @@ static int send_remote_AccS(int datatype, void *scale,
     rem_acc_pack_data(local_data_ptr,
         src_ptr, src_stride_ar, count, stride_levels);
 
-    /* Calculate message length in whole QWs */
-    nelems = (header_size + sizeof(long) - 1)/sizeof(long);
-    // printf("%d: nelems=%d\n", l_state.rank, nelems);
-    assert(nelems <= armci_dmapp_qnelems-1);
-
-    /* Initiate the active message */
-    // printf("%d: send_remote_AccS: queue active message\n", l_state.rank);
-    status = dmapp_queue_put(armci_queue_hndl, header, nelems, DMAPP_QW, proc, 0);
-    if (status != DMAPP_RC_SUCCESS) {
-        fprintf(stderr,"\n dmapp_queue_put FAILED: %d\n", status);
-        assert(0);
-    }
-
+    /* Send operation to the remote queue to be processed */
+    queue_send_operation(header, header_size, proc);
+    
     /* free header */
     free(header);
 
-    /* Wait for completion of Remote accumulate */
-    // printf("%d: send_remote_AccS: block on operation\n", l_state.rank);
-    parmci_notify_wait(proc, &wait);
-    // printf("%d: send_remote_AccS: AccS completed\n", l_state.rank);
+    /* Wait for the completion of Remote Rendezvous Accumulates */
+    if(rem_data_ptr) {
+        // printf("%d: send_remote_AccS: block on operation\n", l_state.rank);
+        parmci_notify_wait(proc, &wait);
+        // printf("%d: send_remote_AccS: AccS completed\n", l_state.rank);
+    }
 
     return 0;
 }
@@ -1630,17 +1712,37 @@ int PARMCI_NbPutValueDouble(double src, void *dst, int proc, armci_hdl_t *handle
 }
 
 
+static int _in_allfence = 0;
+
 void PARMCI_AllFence()
 {
+    int i;
     PARMCI_WaitAll();
-    /* noop for DMAPP */
+
+    _in_allfence = 1;
+    for(i=0; i<l_state.size; i++) {
+        PARMCI_Fence(i);
+    }
+    _in_allfence = 0;
 }
 
 
 void PARMCI_Fence(int proc)
 {
-    PARMCI_WaitAll();
-    /* noop for DMAPP */
+    if(!_in_allfence) {
+        PARMCI_WaitAll();
+    }
+
+#if HAVE_DMAPP_QUEUE
+    int wait;
+    long op = REM_OP_FENCE;
+
+    if(armci_use_rem_acc && queue_fence_list[proc]) {
+        queue_send_operation(&op, sizeof(long), proc);
+        parmci_notify_wait(proc, &wait);
+        queue_fence_list[proc] = 0;
+    } 
+#endif
 }
 
 
@@ -1830,6 +1932,10 @@ static void dmapp_alloc_buf(void)
     l_state.get_buf_len = armci_page_size;
     l_state.get_buf = PARMCI_Malloc_local(l_state.get_buf_len);
     assert(l_state.get_buf);
+
+    #if HAVE_DMAPP_QUEUE
+    queue_fence_list = (int *) malloc(sizeof(int) * l_state.size);
+    #endif
 }
 
 
@@ -2842,6 +2948,9 @@ static void check_envs(void)
     }
     if ((value = getenv("ARMCI_REM_ACC_STRIDED_THRESHOLD")) != NULL) {
         armci_rem_acc_strided_threshold = atoi(value);
+    }
+    if ((value = getenv("ARMCI_REM_ACC_PROFILE_PERIOD")) != NULL) {
+        remote_acc_profile_period = atoi(value);
     }
 #endif
 
