@@ -2530,6 +2530,9 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
     reg_entry_t *reg = NULL;
 
     /* preconditions */
+    if (!ptrs || !group) {
+        printf("precondition failure: ptrs=%x group=%x\n", ptrs, group);
+    }
     assert(ptrs);
     assert(group);
 
@@ -2541,8 +2544,14 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
 
     /* achieve consensus on the allocation size */
     rc = MPI_Allreduce(&size, &max_size, 1, MPI_LONG, MPI_MAX, comm);
+    if(rc != MPI_SUCCESS) {
+        printf("MPI_Allreduce failed to determine allocation size\n"); 
+    }
     assert(rc == MPI_SUCCESS);
     size = max_size;
+    if (size <= 0) {
+       printf("Invalid allocation size (%ld)\n", size);
+    } 
     assert(size > 0);
 
     /* allocate and register segment */
@@ -2569,6 +2578,9 @@ int ARMCI_Malloc_group(void *ptrs[], armci_size_t size, ARMCI_Group *group)
 
     /* allocate receive buffer for exchange of registration info */
     allgather_mr_info = (armci_mr_info_t *)my_malloc(sizeof(armci_mr_info_t) * comm_size);
+    if(!allgather_mr_info) {
+        printf("my_malloc failed\n");
+    }
     assert(allgather_mr_info);
 
     /* exchange registration info */
