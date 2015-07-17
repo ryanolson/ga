@@ -48,7 +48,7 @@
 // Larger values of ARMCI_MAX_LOCKS will require DMAPP_MAX_LOCKS be set at runtime.
 // DMAPP_MAX_LOCKS has a maxium value of 1023
 // Declare an extra lock (ARMCI_MAX_LOCKS) for the use_locks_on_[get|put] case
-#define ARMCI_MAX_LOCKS 128
+#define ARMCI_MAX_LOCKS 1023
 dmapp_lock_desc_t *lock_desc=NULL;
 __thread dmapp_lock_handle_t lock_handle[ARMCI_MAX_LOCKS+1];
 static int use_locks_on_get = 0;
