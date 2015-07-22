@@ -269,17 +269,99 @@ void PARMCI_Copy(void *src, void *dst, int n)
 /* The blocking implementations should use blocking DMAPP calls */
 int PARMCI_Put(void *src, void *dst, int bytes, int proc)
 {
-    PARMCI_Put_nbi(src, dst, bytes, proc);
-    PARMCI_WaitProc(proc);
-    return 0;
+    int status = DMAPP_RC_SUCCESS;
+    int nelems = bytes;
+    int type = DMAPP_BYTE;
+    reg_entry_t *dst_reg = NULL;
+
+    /* Corner case */
+    if (proc == l_state.rank) {
+        PARMCI_Copy(src, dst, bytes);
+        return status;
+    }
+
+    /* Find the dest memory region mapping */
+    dst_reg = reg_cache_find(proc, dst, bytes);
+    assert(dst_reg);
+
+#if HAVE_XPMEM
+    /* XPMEM optimisation */
+    if (armci_uses_shm && ARMCI_Same_node(proc)) {
+        unsigned long offset = (unsigned long) dst - (unsigned long)dst_reg->mr.seg.addr;
+        void *xpmem_addr = (void *) ((unsigned long)dst_reg->mr.vaddr + offset);
+        PARMCI_Copy(src, xpmem_addr, bytes);
+        return status;
+    }
+#endif
+
+    /* If the number of bytes is even, use Double word datatype,
+     * DMAPP_BYTE performance is much worse */
+    if (0 == bytes%16) {
+        nelems = bytes/16;
+        type = DMAPP_DQW;
+    }
+    else if (0 == bytes%8) {
+        nelems = bytes/8;
+        type = DMAPP_QW;
+    }
+    else if (0 == bytes%4) {
+        nelems = bytes/4;
+        type = DMAPP_DW;
+    }
+
+    status = dmapp_put(dst, &(dst_reg->mr.seg), proc, src, nelems, type);
+    assert(status == DMAPP_RC_SUCCESS);
+
+    return status;
 }
 
 
 int PARMCI_Get(void *src, void *dst, int bytes, int proc)
 {
-    PARMCI_Get_nbi(src, dst, bytes, proc);
-    PARMCI_WaitProc(proc);
-    return 0;
+    int status = DMAPP_RC_SUCCESS;
+    int nelems = bytes;
+    int type = DMAPP_BYTE;
+    reg_entry_t *src_reg = NULL;
+
+    /* Corner case */
+    if (proc == l_state.rank) {
+        PARMCI_Copy(src, dst, bytes);
+        return status;
+    }
+
+    /* Find the source memory region mapping */
+    src_reg = reg_cache_find(proc, src, bytes);
+    assert(src_reg);
+
+#if HAVE_XPMEM
+    /* XPMEM optimisation */
+    if (armci_uses_shm && ARMCI_Same_node(proc)) {
+        unsigned long offset = (unsigned long) src - (unsigned long)src_reg->mr.seg.addr;
+        void *xpmem_addr = (void *) ((unsigned long) src_reg->mr.vaddr + offset);
+        PARMCI_Copy(xpmem_addr, dst, bytes);
+        return status;
+    }
+#endif
+
+    /* If the number of bytes is even, use Double word datatype,
+     * DMAPP_BYTE performance is much worse */
+    if (0 == bytes%16) {
+        nelems = bytes/16;
+        type = DMAPP_DQW;
+    }
+    else if (0 == bytes%8) {
+        nelems = bytes/8;
+        type = DMAPP_QW;
+    }
+    else if (0 == bytes%4) {
+        nelems = bytes/4;
+        type = DMAPP_DW;
+    }
+
+    status = dmapp_get(dst, src, &(src_reg->mr.seg), proc, nelems, type);
+    assert(status == DMAPP_RC_SUCCESS);
+
+    return status;
 }
 
 
@@ -328,25 +410,13 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
     }
 
     status = dmapp_put_nbi(dst, &(dst_reg->mr.seg), proc, src, nelems, type);
-    increment_total_outstanding();
-    if (status != DMAPP_RC_SUCCESS) {
-        failure_observed = 1;
-    }
-
-    /* Fallback */
-    if (failure_observed) {
-        PARMCI_WaitAll();
-        assert(bytes <= l_state.put_buf_len);
-        PARMCI_Copy(src, l_state.put_buf, bytes);
-        status = dmapp_put_nbi(dst, &(dst_reg->mr.seg),
-                               proc, l_state.put_buf, nelems, type);
-        increment_total_outstanding();
-        PARMCI_WaitAll();
-
-        /* Fallback must work correctly */
+    if (status == DMAPP_RC_NO_SPACE) {
+        status = dmapp_gsync_wait()
         assert(status == DMAPP_RC_SUCCESS);
+        status = dmapp_put_nbi(dst, &(dst_reg->mr.seg), proc, src, nelems, type);
     }
 
+    assert(status == DMAPP_RC_SUCCESS);
     return status;
 }
 
@@ -394,27 +464,14 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
         type = DMAPP_DW;
     }
 
-    status = dmapp_get_nbi(dst, src, &(src_reg->mr.seg),
-                           proc, nelems, type);
-    increment_total_outstanding();
-    if (status != DMAPP_RC_SUCCESS) {
-        failure_observed = 1;
-    }
-
-    /* Fallback */
-    if (failure_observed) {
-        PARMCI_WaitAll();
-        assert(bytes <= l_state.get_buf_len);
-        status = dmapp_get_nbi(l_state.get_buf, src, &(src_reg->mr.seg),
-                               proc, nelems, type);
-        increment_total_outstanding();
-        PARMCI_WaitAll();
-        PARMCI_Copy(l_state.get_buf, dst, bytes);
-
-        /* Fallback must work correctly */
+    status = dmapp_get_nbi(dst, src, &(src_reg->mr.seg), proc, nelems, type);
+    if (status == DMAPP_RC_NO_SPACE) {
+        status = dmapp_gsync_wait()
         assert(status == DMAPP_RC_SUCCESS);
+        status = dmapp_get_nbi(dst, src, &(src_reg->mr.seg), proc, nelems, type);
     }
 
+    assert(status == DMAPP_RC_SUCCESS);
     return status;
 }
 
