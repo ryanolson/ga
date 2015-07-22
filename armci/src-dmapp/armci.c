@@ -411,7 +411,7 @@ static int PARMCI_Put_nbi(void *src, void *dst, int bytes, int proc)
 
     status = dmapp_put_nbi(dst, &(dst_reg->mr.seg), proc, src, nelems, type);
     if (status == DMAPP_RC_NO_SPACE) {
-        status = dmapp_gsync_wait()
+        status = dmapp_gsync_wait();
         assert(status == DMAPP_RC_SUCCESS);
         status = dmapp_put_nbi(dst, &(dst_reg->mr.seg), proc, src, nelems, type);
     }
@@ -466,7 +466,7 @@ static int PARMCI_Get_nbi(void *src, void *dst, int bytes, int proc)
 
     status = dmapp_get_nbi(dst, src, &(src_reg->mr.seg), proc, nelems, type);
     if (status == DMAPP_RC_NO_SPACE) {
-        status = dmapp_gsync_wait()
+        status = dmapp_gsync_wait();
         assert(status == DMAPP_RC_SUCCESS);
         status = dmapp_get_nbi(dst, src, &(src_reg->mr.seg), proc, nelems, type);
     }
